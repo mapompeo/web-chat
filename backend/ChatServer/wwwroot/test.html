@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8" />
+  <title>Teste manual do ChatHub</title>
+</head>
+<body>
+  <h1>Teste manual do ChatHub</h1>
+  <input id="userName" placeholder="Seu nome" />
+  <input id="roomName" placeholder="Sala" value="sala-1" />
+  <button id="joinBtn">Entrar</button>
+  <hr />
+  <input id="message" placeholder="Mensagem" />
+  <button id="sendBtn">Enviar</button>
+  <h3>Online:</h3>
+  <ul id="onlineList"></ul>
+  <h3>Mensagens:</h3>
+  <ul id="messages"></ul>
+
+  <script src="https://cdn.jsdelivr.net/npm/@microsoft/signalr@latest/dist/browser/signalr.min.js"></script>
+  <script>
+    const connection = new signalR.HubConnectionBuilder().withUrl("/chatHub").build();
+    let currentRoom = "";
+
+    connection.on("RoomJoined", (users) => {
+      document.getElementById("onlineList").innerHTML = users.map(u => `<li>${u}</li>`).join("");
+    });
+    connection.on("UserJoined", (userName, replica) => {
+      log(`${userName} entrou (via ${replica})`);
+      const li = document.createElement("li");
+      li.textContent = userName;
+      document.getElementById("onlineList").appendChild(li);
+    });
+    connection.on("UserLeft", (userName, replica) => log(`${userName} saiu (via ${replica})`));
+    connection.on("ReceiveMessage", (userName, message, replica) => log(`[${replica}] ${userName}: ${message}`));
+
+    function log(text) {
+      const li = document.createElement("li");
+      li.textContent = text;
+      document.getElementById("messages").appendChild(li);
+    }
+
+    document.getElementById("joinBtn").addEventListener("click", async () => {
+      currentRoom = document.getElementById("roomName").value;
+      await connection.start();
+      await connection.invoke("JoinRoom", currentRoom, document.getElementById("userName").value);
+    });
+
+    document.getElementById("sendBtn").addEventListener("click", () => {
+      connection.invoke("SendMessage", currentRoom, document.getElementById("userName").value, document.getElementById("message").value);
+      document.getElementById("message").value = "";
+    });
+  </script>
+</body>
+</html>
