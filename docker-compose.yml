@@ -1,0 +1,13 @@
+services:
+  redis:
+    image: redis:7-alpine
+
+  backend:
+    build: ./backend/ChatServer
+    environment:
+      - REPLICA_NAME=backend
+      - REDIS_CONNECTION=redis:6379
+    ports:
+      - "5000:8080"
+    depends_on:
+      - redis

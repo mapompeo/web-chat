@@ -1,10 +1,17 @@
 using ChatServer.Hubs;
 using ChatServer.Services;
+using StackExchange.Redis;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddSignalR();
-builder.Services.AddSingleton<IRoomPresenceService, InMemoryRoomPresenceService>();
+var redisConnection = builder.Configuration["REDIS_CONNECTION"] ?? "localhost:6379";
+
+builder.Services.AddSingleton<IConnectionMultiplexer>(
+    ConnectionMultiplexer.Connect(redisConnection));
+builder.Services.AddSingleton<IRoomPresenceService, RedisRoomPresenceService>();
+
+builder.Services.AddSignalR()
+    .AddStackExchangeRedis(redisConnection);
 
 builder.Services.AddCors(options =>
 {
