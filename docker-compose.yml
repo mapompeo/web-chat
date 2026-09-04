@@ -2,12 +2,37 @@ services:
   redis:
     image: redis:7-alpine
 
-  backend:
+  backend1:
     build: ./backend/ChatServer
     environment:
-      - REPLICA_NAME=backend
+      - REPLICA_NAME=backend1
       - REDIS_CONNECTION=redis:6379
-    ports:
-      - "5000:8080"
     depends_on:
       - redis
+
+  backend2:
+    build: ./backend/ChatServer
+    environment:
+      - REPLICA_NAME=backend2
+      - REDIS_CONNECTION=redis:6379
+    depends_on:
+      - redis
+
+  backend3:
+    build: ./backend/ChatServer
+    environment:
+      - REPLICA_NAME=backend3
+      - REDIS_CONNECTION=redis:6379
+    depends_on:
+      - redis
+
+  nginx:
+    image: nginx:alpine
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    ports:
+      - "80:80"
+    depends_on:
+      - backend1
+      - backend2
+      - backend3

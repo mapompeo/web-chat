@@ -695,9 +695,19 @@ Abra `http://localhost:5002/test.html` na Aba B (entre como "Bob" na mesma sala)
 Mande uma mensagem da Aba A.
 
 Expected:
-- A mensagem aparece na Aba B mesmo estando em uma réplica diferente.
-- Rodando `docker compose logs -f`, você vê a mensagem sendo logada primeiro em
-  `backend1` (recebida) e depois em `backend2` (entregue), provando que passou pelo Redis.
+- A mensagem aparece na Aba B mesmo estando em uma réplica diferente — e a prova de
+  que ela veio via Redis está no próprio conteúdo: a linha em `test.html` mostra
+  `[backend1] Ana: oi`, ou seja, a Aba B (conectada na `backend2`) recebeu uma
+  mensagem marcada com o nome de uma réplica diferente da sua. Isso só é possível
+  porque a mensagem saiu da `backend1`, foi publicada no Redis, e a `backend2`
+  repassou pro seu cliente.
+- Rodando `docker compose logs -f`, você vê em `backend1` as linhas de "entrou na
+  sala" (Ana) e "mensagem de Ana" — mas **não** espere uma linha equivalente em
+  `backend2` para essa mensagem: a entrega via Redis backplane acontece dentro da
+  biblioteca do SignalR (`AddStackExchangeRedis`), fora do código do Hub, então não
+  há (e não precisa haver) um log custom nesse ponto. O log do lado que *recebeu a
+  chamada do cliente* (`backend1`) + o conteúdo marcado com a réplica de origem que
+  chegou no cliente da `backend2` já são prova suficiente e verificável.
 
 - [ ] **Step 3: Commit**
 
