@@ -418,7 +418,7 @@ git commit -m "feat: ChatHub com salas, presenca em memoria e testes"
 
 **Files:**
 - Create: `backend/ChatServer/Dockerfile`
-- Create: `backend/.dockerignore`
+- Create: `backend/ChatServer/.dockerignore`
 
 **Interfaces:**
 - Consumes: projeto `backend/ChatServer` da Task 1 (publica via `dotnet publish`).
@@ -446,7 +446,7 @@ ENTRYPOINT ["dotnet", "ChatServer.dll"]
 
 - [ ] **Step 2: `.dockerignore`**
 
-`backend/.dockerignore`:
+`backend/ChatServer/.dockerignore` (deve ficar na raiz do contexto de build — `cd backend/ChatServer && docker build .` — não em `backend/`, senão o Docker nunca a encontra):
 
 ```
 **/bin/
