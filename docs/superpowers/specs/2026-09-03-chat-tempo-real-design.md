@@ -97,6 +97,22 @@ Nginx precisa ser configurado para:
   sessions* porque o Redis backplane já resolve a sincronização entre réplicas
   independentemente de qual réplica cada cliente está.
 
+**Detalhe importante do lado do cliente:** por padrão, o cliente do SignalR faz uma
+etapa de *negociação* — um `POST /chatHub/negotiate` separado, que devolve um
+`connectionId`, **antes** de abrir a conexão WebSocket de verdade. Sem sticky
+sessions, o Nginx pode mandar esse `POST /negotiate` pra uma réplica e o upgrade de
+WebSocket subsequente pra outra — e como o `connectionId` só existe na memória da
+réplica que o gerou, a segunda réplica rejeita a conexão (erro citando "sticky
+sessions"). A solução não é reintroduzir sticky sessions (isso voltaria a depender
+do roteamento, o que é exatamente o que este projeto quer evitar) — é configurar o
+cliente para **pular a negociação** e ir direto de WebSocket
+(`skipNegotiation: true` + `transport: HttpTransportType.WebSockets` no
+`HubConnectionBuilder`). Com isso, cada conexão vira uma única requisição atômica
+de upgrade — não há mais um `connectionId` pré-negociado em outra réplica pra dar
+errado, e round-robin sem stickiness volta a ser 100% correto. Essa opção exige que
+o cliente sempre suporte WebSocket nativo (verdade para qualquer navegador moderno,
+o que cobre este projeto).
+
 ### Observabilidade (para o aprendizado, não para produção)
 
 Cada réplica loga, com prefixo identificando ela mesma (ex: `[Réplica 2]`), eventos-chave:

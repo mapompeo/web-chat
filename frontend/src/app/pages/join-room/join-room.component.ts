@@ -15,18 +15,27 @@ import { ChatService } from '../../services/chat.service';
       <input pInputText [(ngModel)]="userName" placeholder="Seu nome" />
       <input pInputText [(ngModel)]="roomName" placeholder="Nome da sala" />
       <p-button label="Entrar" (onClick)="join()" [disabled]="!userName || !roomName" />
+      @if (errorMessage) {
+        <p style="color: #c0392b;">{{ errorMessage }}</p>
+      }
     </div>
   `
 })
 export class JoinRoomComponent {
   userName = '';
   roomName = '';
+  errorMessage = '';
 
   constructor(private chatService: ChatService, private router: Router) {}
 
   async join(): Promise<void> {
-    await this.chatService.connect();
-    await this.chatService.joinRoom(this.roomName, this.userName);
-    this.router.navigate(['/room', this.roomName], { queryParams: { user: this.userName } });
+    try {
+      await this.chatService.connect();
+      await this.chatService.joinRoom(this.roomName, this.userName);
+      this.router.navigate(['/room', this.roomName], { queryParams: { user: this.userName } });
+    } catch (err) {
+      console.error('Falha ao conectar/entrar na sala', err);
+      this.errorMessage = 'Não foi possível conectar ao chat. Verifique se o backend está rodando.';
+    }
   }
 }

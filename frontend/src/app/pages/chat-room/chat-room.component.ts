@@ -25,6 +25,9 @@ import { ChatService } from '../../services/chat.service';
             <strong>{{ msg.userName }}</strong> ({{ msg.replica }}): {{ msg.message }}
           </li>
         </ul>
+        @if (errorMessage) {
+          <p style="color: #c0392b;">{{ errorMessage }}</p>
+        }
         <div style="display: flex; gap: 0.5rem;">
           <input pInputText [(ngModel)]="draft" placeholder="Mensagem" (keyup.enter)="send()" style="flex: 1;" />
           <p-button label="Enviar" (onClick)="send()" />
@@ -37,17 +40,35 @@ export class ChatRoomComponent implements OnInit {
   roomName = '';
   userName = '';
   draft = '';
+  errorMessage = '';
 
   constructor(private route: ActivatedRoute, public chatService: ChatService) {}
 
-  ngOnInit(): void {
+  async ngOnInit(): Promise<void> {
     this.roomName = this.route.snapshot.paramMap.get('room') ?? '';
     this.userName = this.route.snapshot.queryParamMap.get('user') ?? '';
+
+    if (!this.chatService.isConnected) {
+      try {
+        await this.chatService.connect();
+        await this.chatService.joinRoom(this.roomName, this.userName);
+      } catch (err) {
+        console.error('Falha ao conectar/entrar na sala', err);
+        this.errorMessage = 'Não foi possível conectar ao chat. Verifique se o backend está rodando.';
+      }
+    }
   }
 
-  send(): void {
+  async send(): Promise<void> {
     if (!this.draft.trim()) return;
-    this.chatService.sendMessage(this.roomName, this.userName, this.draft);
+    const messageToSend = this.draft;
     this.draft = '';
+    try {
+      await this.chatService.sendMessage(this.roomName, this.userName, messageToSend);
+    } catch (err) {
+      console.error('Falha ao enviar mensagem', err);
+      this.draft = messageToSend;
+      this.errorMessage = 'Não foi possível enviar a mensagem. Verifique a conexão.';
+    }
   }
 }

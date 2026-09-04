@@ -1,0 +1,7 @@
+.git
+.superpowers
+**/node_modules
+**/bin
+**/obj
+frontend/dist
+frontend/.angular

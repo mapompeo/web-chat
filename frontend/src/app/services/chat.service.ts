@@ -14,9 +14,28 @@ export class ChatService {
   readonly onlineUsers = signal<string[]>([]);
   readonly messages = signal<ChatMessage[]>([]);
 
+  get isConnected(): boolean {
+    return this.connection?.state === signalR.HubConnectionState.Connected;
+  }
+
   async connect(): Promise<void> {
+    if (this.connection) {
+      await this.connection.stop();
+    }
+
+    this.messages.set([]);
+    this.onlineUsers.set([]);
+
     this.connection = new signalR.HubConnectionBuilder()
-      .withUrl('/chatHub')
+      // skipNegotiation + WebSockets-only: sem isso, o cliente faz um POST
+      // /negotiate separado antes do upgrade de WebSocket, e sem sticky sessions
+      // o Nginx pode mandar cada requisição pra uma réplica diferente — a segunda
+      // rejeita a conexão porque o connectionId só existe na réplica que negociou.
+      // Pulando a negociação, a conexão vira uma única requisição atômica.
+      .withUrl('/chatHub', {
+        skipNegotiation: true,
+        transport: signalR.HttpTransportType.WebSockets
+      })
       .withAutomaticReconnect()
       .build();
 

@@ -905,7 +905,15 @@ export class ChatService {
 
   async connect(): Promise<void> {
     this.connection = new signalR.HubConnectionBuilder()
-      .withUrl('/chatHub')
+      // skipNegotiation + WebSockets-only: sem isso, o cliente faz um POST
+      // /negotiate separado antes do upgrade de WebSocket, e sem sticky sessions
+      // o Nginx pode mandar cada requisição pra uma réplica diferente — a segunda
+      // rejeita a conexão porque o connectionId só existe na réplica que negociou.
+      // Pulando a negociação, a conexão vira uma única requisição atômica.
+      .withUrl('/chatHub', {
+        skipNegotiation: true,
+        transport: signalR.HttpTransportType.WebSockets
+      })
       .withAutomaticReconnect()
       .build();
 
@@ -1206,6 +1214,12 @@ Nota: se `npm run build` gerar a saída em um caminho diferente de
 events {}
 
 http {
+    # Sem isso, o Nginx serve os .js do Angular como application/octet-stream
+    # (o tipo genérico de fallback), e o navegador recusa executar o módulo ES —
+    # a página carrega em branco mesmo com todas as respostas retornando 200.
+    include /etc/nginx/mime.types;
+    default_type application/octet-stream;
+
     upstream chat_backend {
         server backend1:8080;
         server backend2:8080;
