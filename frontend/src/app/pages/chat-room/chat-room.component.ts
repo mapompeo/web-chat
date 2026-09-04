@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { InputTextModule } from 'primeng/inputtext';
 import { ButtonModule } from 'primeng/button';
 import { ChatMessage, ChatService } from '../../services/chat.service';
+import { ThemeService } from '../../services/theme.service';
 
 @Component({
   selector: 'app-chat-room',
@@ -33,7 +34,17 @@ import { ChatMessage, ChatService } from '../../services/chat.service';
         </ul>
       </aside>
       <main class="conversation">
-        <h3>{{ activeView === 'geral' ? 'Sala Geral' : 'Privado com ' + activeView }}</h3>
+        <div class="conversation-header">
+          <h3>{{ activeView === 'geral' ? 'Sala Geral' : 'Privado com ' + activeView }}</h3>
+          <button
+            class="theme-toggle"
+            type="button"
+            (click)="theme.toggle()"
+            [attr.aria-label]="theme.mode() === 'dark' ? 'Mudar para tema claro' : 'Mudar para tema escuro'"
+          >
+            <i class="pi" [class.pi-sun]="theme.mode() === 'dark'" [class.pi-moon]="theme.mode() === 'light'"></i>
+          </button>
+        </div>
         @if (errorMessage) {
           <p class="error-text">{{ errorMessage }}</p>
         }
@@ -60,7 +71,7 @@ export class ChatRoomComponent implements OnInit {
   activeView: 'geral' | string = 'geral';
   errorMessage = '';
 
-  constructor(private route: ActivatedRoute, public chatService: ChatService) {}
+  constructor(private route: ActivatedRoute, public chatService: ChatService, public theme: ThemeService) {}
 
   async ngOnInit(): Promise<void> {
     this.userName = this.route.snapshot.queryParamMap.get('user') ?? '';
