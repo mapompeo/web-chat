@@ -5,6 +5,8 @@ namespace ChatServer.Hubs;
 
 public class ChatHub : Hub
 {
+    private const string GeralRoom = "Geral";
+
     private readonly ILogger<ChatHub> _logger;
     private readonly IRoomPresenceService _presence;
     private readonly string _replicaName;
@@ -16,39 +18,55 @@ public class ChatHub : Hub
         _replicaName = configuration["REPLICA_NAME"] ?? "local";
     }
 
-    public async Task JoinRoom(string roomName, string userName)
+    public override async Task OnConnectedAsync()
     {
-        await Groups.AddToGroupAsync(Context.ConnectionId, roomName);
-        Context.Items["RoomName"] = roomName;
-        Context.Items["UserName"] = userName;
+        var userName = Context.UserIdentifier;
+        if (!string.IsNullOrEmpty(userName))
+        {
+            await Groups.AddToGroupAsync(Context.ConnectionId, GeralRoom);
+            var onlineUsers = await _presence.AddUserAsync(GeralRoom, userName);
 
-        var onlineUsers = await _presence.AddUserAsync(roomName, userName);
+            _logger.LogInformation("[{Replica}] {User} entrou na Sala Geral", _replicaName, userName);
 
-        _logger.LogInformation("[{Replica}] {User} entrou na sala {Room}", _replicaName, userName, roomName);
+            await Clients.Caller.SendAsync("RoomJoined", onlineUsers);
+            await Clients.OthersInGroup(GeralRoom).SendAsync("UserJoined", userName, _replicaName);
+        }
 
-        await Clients.Caller.SendAsync("RoomJoined", onlineUsers);
-        await Clients.OthersInGroup(roomName).SendAsync("UserJoined", userName, _replicaName);
+        await base.OnConnectedAsync();
     }
 
-    public async Task SendMessage(string roomName, string userName, string message)
+    public async Task SendMessage(string message)
     {
-        _logger.LogInformation(
-            "[{Replica}] mensagem de {User} na sala {Room}: {Message}",
-            _replicaName, userName, roomName, message);
+        var userName = Context.UserIdentifier ?? "desconhecido";
 
-        await Clients.Group(roomName).SendAsync("ReceiveMessage", userName, message, _replicaName);
+        _logger.LogInformation(
+            "[{Replica}] mensagem de {User} na Sala Geral: {Message}",
+            _replicaName, userName, message);
+
+        await Clients.Group(GeralRoom).SendAsync("ReceiveMessage", userName, message, _replicaName);
+    }
+
+    public async Task SendPrivateMessage(string toUserName, string message)
+    {
+        var fromUserName = Context.UserIdentifier ?? "desconhecido";
+
+        _logger.LogInformation(
+            "[{Replica}] mensagem privada de {From} para {To}: {Message}",
+            _replicaName, fromUserName, toUserName, message);
+
+        await Clients.User(toUserName).SendAsync("ReceivePrivateMessage", fromUserName, message, _replicaName);
     }
 
     public override async Task OnDisconnectedAsync(Exception? exception)
     {
-        if (Context.Items.TryGetValue("RoomName", out var roomObj) && roomObj is string roomName &&
-            Context.Items.TryGetValue("UserName", out var userObj) && userObj is string userName)
+        var userName = Context.UserIdentifier;
+        if (!string.IsNullOrEmpty(userName))
         {
-            await _presence.RemoveUserAsync(roomName, userName);
+            await _presence.RemoveUserAsync(GeralRoom, userName);
 
-            _logger.LogInformation("[{Replica}] {User} saiu da sala {Room}", _replicaName, userName, roomName);
+            _logger.LogInformation("[{Replica}] {User} saiu da Sala Geral", _replicaName, userName);
 
-            await Clients.Group(roomName).SendAsync("UserLeft", userName, _replicaName);
+            await Clients.Group(GeralRoom).SendAsync("UserLeft", userName, _replicaName);
         }
 
         await base.OnDisconnectedAsync(exception);

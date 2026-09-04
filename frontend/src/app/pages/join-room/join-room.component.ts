@@ -10,31 +10,30 @@ import { ChatService } from '../../services/chat.service';
   standalone: true,
   imports: [FormsModule, InputTextModule, ButtonModule],
   template: `
-    <div class="join-container" style="max-width: 320px; margin: 4rem auto; display: flex; flex-direction: column; gap: 1rem;">
+    <div class="join-container">
       <h1>Entrar no chat</h1>
-      <input pInputText [(ngModel)]="userName" placeholder="Seu nome" />
-      <input pInputText [(ngModel)]="roomName" placeholder="Nome da sala" />
-      <p-button label="Entrar" (onClick)="join()" [disabled]="!userName || !roomName" />
+      <input pInputText [(ngModel)]="userName" placeholder="Seu nome" (keyup.enter)="join()" />
+      <p-button label="Entrar" (onClick)="join()" [disabled]="!userName.trim()" />
       @if (errorMessage) {
-        <p style="color: #c0392b;">{{ errorMessage }}</p>
+        <p class="error-text">{{ errorMessage }}</p>
       }
     </div>
   `
 })
 export class JoinRoomComponent {
   userName = '';
-  roomName = '';
   errorMessage = '';
 
   constructor(private chatService: ChatService, private router: Router) {}
 
   async join(): Promise<void> {
+    if (!this.userName.trim()) return;
+
+    this.errorMessage = '';
     try {
-      await this.chatService.connect();
-      await this.chatService.joinRoom(this.roomName, this.userName);
-      this.router.navigate(['/room', this.roomName], { queryParams: { user: this.userName } });
-    } catch (err) {
-      console.error('Falha ao conectar/entrar na sala', err);
+      await this.chatService.connect(this.userName);
+      this.router.navigate(['/chat'], { queryParams: { user: this.userName } });
+    } catch {
       this.errorMessage = 'Não foi possível conectar ao chat. Verifique se o backend está rodando.';
     }
   }

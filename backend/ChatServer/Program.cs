@@ -1,5 +1,6 @@
 using ChatServer.Hubs;
 using ChatServer.Services;
+using Microsoft.AspNetCore.SignalR;
 using StackExchange.Redis;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -12,6 +13,8 @@ builder.Services.AddSingleton<IRoomPresenceService, RedisRoomPresenceService>();
 
 builder.Services.AddSignalR()
     .AddStackExchangeRedis(redisConnection);
+
+builder.Services.AddSingleton<IUserIdProvider, QueryStringUserIdProvider>();
 
 builder.Services.AddCors(options =>
 {
@@ -29,8 +32,6 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 
-app.UseDefaultFiles();
-app.UseStaticFiles();
 app.UseCors("AllowFrontend");
 
 app.MapHub<ChatHub>("/chatHub");

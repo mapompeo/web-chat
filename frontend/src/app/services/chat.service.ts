@@ -11,20 +11,24 @@ export interface ChatMessage {
 export class ChatService {
   private connection?: signalR.HubConnection;
 
+  readonly currentUserName = signal<string>('');
   readonly onlineUsers = signal<string[]>([]);
-  readonly messages = signal<ChatMessage[]>([]);
+  readonly geralMessages = signal<ChatMessage[]>([]);
+  readonly privateMessages = signal<Map<string, ChatMessage[]>>(new Map());
 
   get isConnected(): boolean {
     return this.connection?.state === signalR.HubConnectionState.Connected;
   }
 
-  async connect(): Promise<void> {
+  async connect(userName: string): Promise<void> {
     if (this.connection) {
       await this.connection.stop();
     }
 
-    this.messages.set([]);
+    this.currentUserName.set(userName);
+    this.geralMessages.set([]);
     this.onlineUsers.set([]);
+    this.privateMessages.set(new Map());
 
     this.connection = new signalR.HubConnectionBuilder()
       // skipNegotiation + WebSockets-only: sem isso, o cliente faz um POST
@@ -32,7 +36,7 @@ export class ChatService {
       // o Nginx pode mandar cada requisição pra uma réplica diferente — a segunda
       // rejeita a conexão porque o connectionId só existe na réplica que negociou.
       // Pulando a negociação, a conexão vira uma única requisição atômica.
-      .withUrl('/chatHub', {
+      .withUrl(`/chatHub?user=${encodeURIComponent(userName)}`, {
         skipNegotiation: true,
         transport: signalR.HttpTransportType.WebSockets
       })
@@ -43,26 +47,46 @@ export class ChatService {
       this.onlineUsers.set(users);
     });
 
-    this.connection.on('UserJoined', (userName: string) => {
-      this.onlineUsers.update(users => [...users, userName]);
+    this.connection.on('UserJoined', (joinedUser: string) => {
+      this.onlineUsers.update(users => users.includes(joinedUser) ? users : [...users, joinedUser]);
     });
 
-    this.connection.on('UserLeft', (userName: string) => {
-      this.onlineUsers.update(users => users.filter(u => u !== userName));
+    this.connection.on('UserLeft', (leftUser: string) => {
+      this.onlineUsers.update(users => users.filter(u => u !== leftUser));
     });
 
-    this.connection.on('ReceiveMessage', (userName: string, message: string, replica: string) => {
-      this.messages.update(msgs => [...msgs, { userName, message, replica }]);
+    this.connection.on('ReceiveMessage', (fromUser: string, message: string, replica: string) => {
+      this.geralMessages.update(msgs => [...msgs, { userName: fromUser, message, replica }]);
+    });
+
+    this.connection.on('ReceivePrivateMessage', (fromUser: string, message: string, replica: string) => {
+      this.privateMessages.update(map => {
+        const next = new Map(map);
+        const existing = next.get(fromUser) ?? [];
+        next.set(fromUser, [...existing, { userName: fromUser, message, replica }]);
+        return next;
+      });
     });
 
     await this.connection.start();
   }
 
-  async joinRoom(roomName: string, userName: string): Promise<void> {
-    await this.connection?.invoke('JoinRoom', roomName, userName);
+  async sendMessage(message: string): Promise<void> {
+    await this.connection?.invoke('SendMessage', message);
   }
 
-  async sendMessage(roomName: string, userName: string, message: string): Promise<void> {
-    await this.connection?.invoke('SendMessage', roomName, userName, message);
+  async sendPrivateMessage(toUserName: string, message: string): Promise<void> {
+    await this.connection?.invoke('SendPrivateMessage', toUserName, message);
+
+    // O servidor não ecoa a mensagem de volta pra quem manda (só entrega pro
+    // destinatário) — um eco não teria como carregar "pra quem eu mandei" de forma
+    // inequívoca. Como já sabemos localmente o que mandamos e pra quem, adicionamos
+    // na nossa própria conversa assim que o envio é confirmado.
+    this.privateMessages.update(map => {
+      const next = new Map(map);
+      const existing = next.get(toUserName) ?? [];
+      next.set(toUserName, [...existing, { userName: this.currentUserName(), message, replica: '' }]);
+      return next;
+    });
   }
 }

@@ -13,19 +13,50 @@ namespace ChatServer.Tests;
 public class ChatHubTests
 {
     [Fact]
-    public async Task SendMessage_BroadcastsToRoomGroup()
+    public async Task OnConnectedAsync_AddsCallerToGeral_AndSendsCurrentOnlineUsers()
+    {
+        var presence = new Mock<IRoomPresenceService>();
+        presence.Setup(p => p.AddUserAsync("Geral", "Ana"))
+            .ReturnsAsync(new List<string> { "Ana", "Bob" });
+
+        var groups = new Mock<IGroupManager>();
+        var callerProxy = new Mock<ISingleClientProxy>();
+        var clients = new Mock<IHubCallerClients>();
+        clients.Setup(c => c.Caller).Returns(callerProxy.Object);
+        clients.Setup(c => c.OthersInGroup("Geral")).Returns(Mock.Of<IClientProxy>());
+
+        var hub = new ChatHub(Mock.Of<ILogger<ChatHub>>(), BuildConfig(), presence.Object)
+        {
+            Groups = groups.Object,
+            Clients = clients.Object,
+            Context = new FakeHubCallerContext("conn-1", "Ana")
+        };
+
+        await hub.OnConnectedAsync();
+
+        groups.Verify(g => g.AddToGroupAsync("conn-1", "Geral", It.IsAny<CancellationToken>()), Times.Once);
+        callerProxy.Verify(
+            c => c.SendCoreAsync(
+                "RoomJoined",
+                It.Is<object[]>(a => ((List<string>)a[0]!).Contains("Bob")),
+                It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task SendMessage_BroadcastsToGeralGroup()
     {
         var groupProxy = new Mock<IClientProxy>();
         var clients = new Mock<IHubCallerClients>();
-        clients.Setup(c => c.Group("sala-1")).Returns(groupProxy.Object);
+        clients.Setup(c => c.Group("Geral")).Returns(groupProxy.Object);
 
         var hub = new ChatHub(Mock.Of<ILogger<ChatHub>>(), BuildConfig(), Mock.Of<IRoomPresenceService>())
         {
             Clients = clients.Object,
-            Context = new FakeHubCallerContext("conn-1")
+            Context = new FakeHubCallerContext("conn-1", "Ana")
         };
 
-        await hub.SendMessage("sala-1", "Ana", "oi pessoal");
+        await hub.SendMessage("oi pessoal");
 
         groupProxy.Verify(
             p => p.SendCoreAsync(
@@ -36,32 +67,52 @@ public class ChatHubTests
     }
 
     [Fact]
-    public async Task JoinRoom_AddsCallerToGroup_AndSendsCurrentOnlineUsers()
+    public async Task SendPrivateMessage_DeliversOnlyToTargetUser()
+    {
+        var targetProxy = new Mock<IClientProxy>();
+        var clients = new Mock<IHubCallerClients>();
+        clients.Setup(c => c.User("Bob")).Returns(targetProxy.Object);
+
+        var hub = new ChatHub(Mock.Of<ILogger<ChatHub>>(), BuildConfig(), Mock.Of<IRoomPresenceService>())
+        {
+            Clients = clients.Object,
+            Context = new FakeHubCallerContext("conn-1", "Ana")
+        };
+
+        await hub.SendPrivateMessage("Bob", "oi Bob, so pra voce");
+
+        targetProxy.Verify(
+            p => p.SendCoreAsync(
+                "ReceivePrivateMessage",
+                It.Is<object[]>(a => (string)a[0]! == "Ana" && (string)a[1]! == "oi Bob, so pra voce" && (string)a[2]! == "test-replica"),
+                It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task OnDisconnectedAsync_RemovesPresence_AndNotifiesGeral()
     {
         var presence = new Mock<IRoomPresenceService>();
-        presence.Setup(p => p.AddUserAsync("sala-1", "Ana"))
-            .ReturnsAsync(new List<string> { "Ana", "Bob" });
+        presence.Setup(p => p.RemoveUserAsync("Geral", "Ana"))
+            .ReturnsAsync(new List<string> { "Bob" });
 
-        var groups = new Mock<IGroupManager>();
-        var callerProxy = new Mock<ISingleClientProxy>();
+        var groupProxy = new Mock<IClientProxy>();
         var clients = new Mock<IHubCallerClients>();
-        clients.Setup(c => c.Caller).Returns(callerProxy.Object);
-        clients.Setup(c => c.OthersInGroup("sala-1")).Returns(Mock.Of<IClientProxy>());
+        clients.Setup(c => c.Group("Geral")).Returns(groupProxy.Object);
 
         var hub = new ChatHub(Mock.Of<ILogger<ChatHub>>(), BuildConfig(), presence.Object)
         {
-            Groups = groups.Object,
             Clients = clients.Object,
-            Context = new FakeHubCallerContext("conn-1")
+            Context = new FakeHubCallerContext("conn-1", "Ana")
         };
 
-        await hub.JoinRoom("sala-1", "Ana");
+        await hub.OnDisconnectedAsync(null);
 
-        groups.Verify(g => g.AddToGroupAsync("conn-1", "sala-1", It.IsAny<CancellationToken>()), Times.Once);
-        callerProxy.Verify(
-            c => c.SendCoreAsync(
-                "RoomJoined",
-                It.Is<object[]>(a => ((List<string>)a[0]!).Contains("Bob")),
+        presence.Verify(p => p.RemoveUserAsync("Geral", "Ana"), Times.Once);
+        groupProxy.Verify(
+            p => p.SendCoreAsync(
+                "UserLeft",
+                It.Is<object[]>(a => (string)a[0]! == "Ana"),
                 It.IsAny<CancellationToken>()),
             Times.Once);
     }
@@ -75,13 +126,17 @@ public class ChatHubTests
     private class FakeHubCallerContext : HubCallerContext
     {
         public override string ConnectionId { get; }
-        public override string? UserIdentifier => null;
+        public override string? UserIdentifier { get; }
         public override ClaimsPrincipal? User => null;
         public override IDictionary<object, object?> Items { get; } = new Dictionary<object, object?>();
         public override IFeatureCollection Features { get; } = new FeatureCollection();
         public override CancellationToken ConnectionAborted => CancellationToken.None;
         public override void Abort() { }
 
-        public FakeHubCallerContext(string connectionId) => ConnectionId = connectionId;
+        public FakeHubCallerContext(string connectionId, string? userIdentifier)
+        {
+            ConnectionId = connectionId;
+            UserIdentifier = userIdentifier;
+        }
     }
 }
