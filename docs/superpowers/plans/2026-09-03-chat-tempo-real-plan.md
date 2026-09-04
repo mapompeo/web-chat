@@ -852,6 +852,7 @@ git commit -m "feat: nginx como load balancer na frente das replicas"
 npx @angular/cli@latest new frontend --routing --style=scss --skip-git --ssr=false
 cd frontend
 npm install primeng primeicons @primeuix/themes
+npm install @angular/animations
 npm install @microsoft/signalr
 ```
 

@@ -1,0 +1,7 @@
+{
+  "/chatHub": {
+    "target": "http://localhost:80",
+    "ws": true,
+    "changeOrigin": true
+  }
+}
