@@ -8,8 +8,26 @@ export interface ChatMessage {
   timestamp: string;
 }
 
+export interface VisualizerPulse {
+  id: string;
+  kind: 'connect' | 'disconnect' | 'geral' | 'privada';
+  replica?: string;           // connect/disconnect
+  fromReplica?: string;       // geral/privada
+  toReplicas?: string[];      // geral (leque) ou privada (pode ter mais de uma réplica)
+  userName?: string;          // connect/disconnect/geral — nunca em privada
+}
+
 @Injectable({ providedIn: 'root' })
 export class ChatService {
+  // Duração de cada "perna" da jornada do pulso no painel do visualizador —
+  // precisa bater com HOP_MS em visualizer-panel.component.ts e com a duração
+  // da animação em @keyframes viz-flow-down/viz-flow-up no styles.scss. Uma
+  // mensagem percorre até 6 pernas (pessoa → nginx → servidor → redis → outro
+  // servidor → nginx → outra pessoa); conectar/desconectar só percorre 2
+  // (pessoa ↔ nginx ↔ servidor, nunca toca o Redis). O pulso só pode sumir da
+  // tela depois que a última perna dele já tiver terminado de animar.
+  private static readonly HOP_MS = 500;
+
   private connection?: signalR.HubConnection;
 
   readonly currentUserName = signal<string>('');
@@ -17,6 +35,13 @@ export class ChatService {
   readonly geralMessages = signal<ChatMessage[]>([]);
   readonly privateMessages = signal<Map<string, ChatMessage[]>>(new Map());
   readonly unreadPrivate = signal<Set<string>>(new Set());
+  readonly replicaUsers = signal<Map<string, string[]>>(new Map());
+  readonly visualizerPulses = signal<VisualizerPulse[]>([]);
+  // Preenchido quando o servidor recusa a entrada (nome inválido ou já em
+  // uso). Quem consome isso (ChatRoomComponent) precisa reagir de forma
+  // reativa — start() já resolveu com sucesso antes desse evento chegar,
+  // então não dá pra simplesmente capturar isso como um erro do connect().
+  readonly joinError = signal<string | null>(null);
 
   get isConnected(): boolean {
     return this.connection?.state === signalR.HubConnectionState.Connected;
@@ -32,6 +57,9 @@ export class ChatService {
     this.onlineUsers.set([]);
     this.privateMessages.set(new Map());
     this.unreadPrivate.set(new Set());
+    this.replicaUsers.set(new Map());
+    this.visualizerPulses.set([]);
+    this.joinError.set(null);
 
     this.connection = new signalR.HubConnectionBuilder()
       // skipNegotiation + WebSockets-only: sem isso, o cliente faz um POST
@@ -75,6 +103,51 @@ export class ChatService {
       this.unreadPrivate.update(set => new Set(set).add(fromUser));
     });
 
+    this.connection.on('VisualizerSnapshot', (snapshot: Record<string, string[]>) => {
+      this.replicaUsers.set(new Map(Object.entries(snapshot)));
+    });
+
+    this.connection.on('VisualizerUserConnected', (replica: string, connectedUser: string) => {
+      this.replicaUsers.update(map => {
+        const next = new Map(map);
+        const users = next.get(replica) ?? [];
+        if (!users.includes(connectedUser)) {
+          next.set(replica, [...users, connectedUser]);
+        }
+        return next;
+      });
+      this.addPulse({ kind: 'connect', replica, userName: connectedUser });
+    });
+
+    this.connection.on('VisualizerUserDisconnected', (replica: string, disconnectedUser: string) => {
+      this.replicaUsers.update(map => {
+        const next = new Map(map);
+        const users = next.get(replica) ?? [];
+        next.set(replica, users.filter(u => u !== disconnectedUser));
+        return next;
+      });
+      this.addPulse({ kind: 'disconnect', replica, userName: disconnectedUser });
+    });
+
+    this.connection.on('VisualizerGeralMessage', (fromReplica: string, geralUser: string, activeReplicas: string[]) => {
+      this.addPulse({ kind: 'geral', fromReplica, toReplicas: activeReplicas, userName: geralUser });
+    });
+
+    this.connection.on('VisualizerPrivateMessage', (fromReplica: string, toReplicas: string[]) => {
+      this.addPulse({ kind: 'privada', fromReplica, toReplicas });
+    });
+
+    this.connection.on('JoinRejected', (reason: string) => {
+      this.joinError.set(reason);
+      // Chamar stop() explicitamente (em vez de deixar a conexão cair
+      // "sozinha") é o que impede o withAutomaticReconnect() de tentar de
+      // novo — reconexão automática só dispara quando a conexão cai de
+      // forma inesperada, nunca depois de um stop() intencional. Sem isso,
+      // o cliente ficaria reconectando (e sendo recusado de novo) num loop
+      // silencioso, sem nunca mostrar erro nenhum.
+      void this.connection?.stop();
+    });
+
     await this.connection.start();
   }
 
@@ -107,5 +180,19 @@ export class ChatService {
       ]);
       return next;
     });
+  }
+
+  private addPulse(pulse: Omit<VisualizerPulse, 'id'>): void {
+    const id = `${Date.now()}-${Math.random()}`;
+    const fullPulse: VisualizerPulse = { ...pulse, id };
+    this.visualizerPulses.update(pulses => [...pulses, fullPulse]);
+
+    // Conectar/desconectar percorre 2 pernas (pessoa↔nginx↔servidor); mensagem
+    // geral ou privada percorre até 6 (pessoa→nginx→servidor→redis→outro
+    // servidor→nginx→outra pessoa) — ver VisualizerPanelComponent.legsFor.
+    const totalLegs = pulse.kind === 'connect' || pulse.kind === 'disconnect' ? 2 : 6;
+    setTimeout(() => {
+      this.visualizerPulses.update(pulses => pulses.filter(p => p.id !== id));
+    }, totalLegs * ChatService.HOP_MS);
   }
 }

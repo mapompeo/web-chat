@@ -66,7 +66,7 @@ public class RedisRoomPresenceService : IRoomPresenceService
         return await GetUsersAsync(roomName);
     }
 
-    private async Task<IReadOnlyList<string>> GetUsersAsync(string roomName)
+    public async Task<IReadOnlyList<string>> GetUsersAsync(string roomName)
     {
         var db = _redis.GetDatabase();
         var fields = await db.HashKeysAsync(RoomKey(roomName));

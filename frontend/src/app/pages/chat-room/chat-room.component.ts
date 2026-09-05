@@ -6,11 +6,12 @@ import { ButtonModule } from 'primeng/button';
 import { ChatMessage, ChatService } from '../../services/chat.service';
 import { ThemeService } from '../../services/theme.service';
 import { AvatarService } from '../../services/avatar.service';
+import { VisualizerPanelComponent } from '../../components/visualizer-panel/visualizer-panel.component';
 
 @Component({
   selector: 'app-chat-room',
   standalone: true,
-  imports: [FormsModule, InputTextModule, ButtonModule],
+  imports: [FormsModule, InputTextModule, ButtonModule, VisualizerPanelComponent],
   template: `
     <div class="chat-container">
       <aside class="sidebar">
@@ -42,17 +43,27 @@ import { AvatarService } from '../../services/avatar.service';
       <main class="conversation">
         <div class="conversation-header">
           <h3>{{ activeView === 'geral' ? 'Sala Geral' : 'Privado com ' + activeView }}</h3>
-          <button
-            class="theme-toggle"
-            type="button"
-            (click)="theme.toggle()"
-            [attr.aria-label]="theme.mode() === 'dark' ? 'Mudar para tema claro' : 'Mudar para tema escuro'"
-          >
-            <i class="pi" [class.pi-sun]="theme.mode() === 'dark'" [class.pi-moon]="theme.mode() === 'light'"></i>
-          </button>
+          <div class="header-actions">
+            <button
+              class="theme-toggle"
+              type="button"
+              (click)="showVisualizer = !showVisualizer"
+              [attr.aria-label]="showVisualizer ? 'Esconder visualizador de arquitetura' : 'Mostrar visualizador de arquitetura'"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:1rem;height:1rem;"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M15 3v18"/></svg>
+            </button>
+            <button
+              class="theme-toggle"
+              type="button"
+              (click)="theme.toggle()"
+              [attr.aria-label]="theme.mode() === 'dark' ? 'Mudar para tema claro' : 'Mudar para tema escuro'"
+            >
+              <i class="pi" [class.pi-sun]="theme.mode() === 'dark'" [class.pi-moon]="theme.mode() === 'light'"></i>
+            </button>
+          </div>
         </div>
-        @if (errorMessage) {
-          <p class="error-text">{{ errorMessage }}</p>
+        @if (errorMessage || chatService.joinError()) {
+          <p class="error-text">{{ errorMessage || chatService.joinError() }}</p>
         }
         <ul class="message-list" #messageListEl>
           @for (msg of currentMessages(); track $index) {
@@ -61,10 +72,6 @@ import { AvatarService } from '../../services/avatar.service';
               <div class="message-col">
                 <div class="message-info">
                   <strong>{{ msg.userName }}</strong>
-                  @if (msg.replica) {
-                    <span class="dot">·</span>
-                    <span class="replica-tag">{{ msg.replica }}</span>
-                  }
                   <span class="dot">·</span>
                   <span class="timestamp">{{ formatTime(msg.timestamp) }}</span>
                 </div>
@@ -78,6 +85,9 @@ import { AvatarService } from '../../services/avatar.service';
           <p-button label="Enviar" (onClick)="send()" />
         </div>
       </main>
+      @if (showVisualizer) {
+        <app-visualizer-panel />
+      }
     </div>
   `
 })
@@ -86,6 +96,7 @@ export class ChatRoomComponent implements OnInit {
   draft = '';
   activeView: 'geral' | string = 'geral';
   errorMessage = '';
+  showVisualizer = true;
 
   @ViewChild('messageListEl') messageListEl!: ElementRef<HTMLElement>;
 
