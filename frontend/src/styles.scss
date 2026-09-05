@@ -112,7 +112,7 @@ body {
   p-button {
     width: 100%;
 
-    ::ng-deep .p-button {
+    .p-button {
       width: 100%;
       justify-content: center;
     }
@@ -160,6 +160,10 @@ body {
 
 .conversation-item {
   width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
   text-align: left;
   padding: 0.6rem 0.75rem;
   border: none;
@@ -179,6 +183,14 @@ body {
     color: var(--accent);
     font-weight: 600;
   }
+}
+
+.unread-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--danger);
+  flex-shrink: 0;
 }
 
 .conversation {
@@ -215,9 +227,58 @@ body {
   gap: 0.6rem;
 }
 
-.message {
+.message-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.6rem;
   max-width: 65%;
   align-self: flex-start;
+
+  &.mine {
+    align-self: flex-end;
+    flex-direction: row-reverse;
+  }
+}
+
+.avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: var(--bg);
+}
+
+.message-col {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.message-row.mine .message-col {
+  align-items: flex-end;
+}
+
+.message-info {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  margin-bottom: 0.25rem;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+
+  strong {
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--text);
+  }
+
+  .dot {
+    opacity: 0.5;
+  }
+}
+
+.message-bubble {
+  margin: 0;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 12px;
@@ -225,30 +286,12 @@ body {
   font-size: 0.95rem;
   line-height: 1.4;
   word-break: break-word;
-
-  strong {
-    display: block;
-    font-size: 0.78rem;
-    color: var(--text-muted);
-    margin-bottom: 0.15rem;
-    font-weight: 600;
-  }
-
-  &.mine {
-    align-self: flex-end;
-    background: var(--accent);
-    border-color: var(--accent);
-    color: #fff;
-
-    strong {
-      color: rgba(255, 255, 255, 0.85);
-    }
-  }
 }
 
-.replica-tag {
-  font-style: italic;
-  opacity: 0.75;
+.message-row.mine .message-bubble {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
 }
 
 .input-row {

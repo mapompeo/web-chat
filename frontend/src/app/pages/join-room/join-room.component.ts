@@ -41,9 +41,10 @@ export class JoinRoomComponent {
     if (!this.userName.trim()) return;
 
     this.errorMessage = '';
+    const trimmedName = this.userName.trim();
     try {
-      await this.chatService.connect(this.userName);
-      this.router.navigate(['/chat'], { queryParams: { user: this.userName } });
+      await this.chatService.connect(trimmedName);
+      this.router.navigate(['/chat'], { queryParams: { user: trimmedName } });
     } catch {
       this.errorMessage = 'Não foi possível conectar ao chat. Verifique se o backend está rodando.';
     }

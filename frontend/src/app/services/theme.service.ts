@@ -12,7 +12,12 @@ export class ThemeService {
     effect(() => {
       const mode = this.mode();
       document.documentElement.setAttribute('data-theme', mode);
-      localStorage.setItem(STORAGE_KEY, mode);
+      try {
+        localStorage.setItem(STORAGE_KEY, mode);
+      } catch {
+        // Contextos de navegação privada podem bloquear localStorage; o tema
+        // ainda funciona nessa sessão, só não persiste entre recarregamentos.
+      }
     });
   }
 
@@ -21,7 +26,11 @@ export class ThemeService {
   }
 
   private loadInitialMode(): ThemeMode {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    return saved === 'light' ? 'light' : 'dark';
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      return saved === 'light' ? 'light' : 'dark';
+    } catch {
+      return 'dark';
+    }
   }
 }

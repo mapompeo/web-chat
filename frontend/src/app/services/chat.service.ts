@@ -5,6 +5,7 @@ export interface ChatMessage {
   userName: string;
   message: string;
   replica: string;
+  timestamp: string;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -15,6 +16,7 @@ export class ChatService {
   readonly onlineUsers = signal<string[]>([]);
   readonly geralMessages = signal<ChatMessage[]>([]);
   readonly privateMessages = signal<Map<string, ChatMessage[]>>(new Map());
+  readonly unreadPrivate = signal<Set<string>>(new Set());
 
   get isConnected(): boolean {
     return this.connection?.state === signalR.HubConnectionState.Connected;
@@ -29,6 +31,7 @@ export class ChatService {
     this.geralMessages.set([]);
     this.onlineUsers.set([]);
     this.privateMessages.set(new Map());
+    this.unreadPrivate.set(new Set());
 
     this.connection = new signalR.HubConnectionBuilder()
       // skipNegotiation + WebSockets-only: sem isso, o cliente faz um POST
@@ -55,20 +58,33 @@ export class ChatService {
       this.onlineUsers.update(users => users.filter(u => u !== leftUser));
     });
 
-    this.connection.on('ReceiveMessage', (fromUser: string, message: string, replica: string) => {
-      this.geralMessages.update(msgs => [...msgs, { userName: fromUser, message, replica }]);
+    this.connection.on('ReceiveMessage', (fromUser: string, message: string, replica: string, timestamp: string) => {
+      this.geralMessages.update(msgs => [...msgs, { userName: fromUser, message, replica, timestamp }]);
     });
 
-    this.connection.on('ReceivePrivateMessage', (fromUser: string, message: string, replica: string) => {
+    this.connection.on('ReceivePrivateMessage', (fromUser: string, message: string, replica: string, timestamp: string) => {
       this.privateMessages.update(map => {
         const next = new Map(map);
         const existing = next.get(fromUser) ?? [];
-        next.set(fromUser, [...existing, { userName: fromUser, message, replica }]);
+        next.set(fromUser, [...existing, { userName: fromUser, message, replica, timestamp }]);
         return next;
       });
+      // Marca como não lida sempre — quem estiver com a conversa aberta na hora
+      // limpa isso de volta imediatamente (ver efeito em ChatRoomComponent), então
+      // na prática só fica marcado quem realmente não está olhando aquela conversa.
+      this.unreadPrivate.update(set => new Set(set).add(fromUser));
     });
 
     await this.connection.start();
+  }
+
+  markPrivateRead(userName: string): void {
+    this.unreadPrivate.update(set => {
+      if (!set.has(userName)) return set;
+      const next = new Set(set);
+      next.delete(userName);
+      return next;
+    });
   }
 
   async sendMessage(message: string): Promise<void> {
@@ -85,7 +101,10 @@ export class ChatService {
     this.privateMessages.update(map => {
       const next = new Map(map);
       const existing = next.get(toUserName) ?? [];
-      next.set(toUserName, [...existing, { userName: this.currentUserName(), message, replica: '' }]);
+      next.set(toUserName, [
+        ...existing,
+        { userName: this.currentUserName(), message, replica: '', timestamp: new Date().toISOString() }
+      ]);
       return next;
     });
   }

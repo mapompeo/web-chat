@@ -1,10 +1,11 @@
-import { Component, OnInit } from '@angular/core';
-import { ActivatedRoute } from '@angular/router';
+import { Component, OnInit, ViewChild, ElementRef, effect } from '@angular/core';
+import { ActivatedRoute, Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { InputTextModule } from 'primeng/inputtext';
 import { ButtonModule } from 'primeng/button';
 import { ChatMessage, ChatService } from '../../services/chat.service';
 import { ThemeService } from '../../services/theme.service';
+import { AvatarService } from '../../services/avatar.service';
 
 @Component({
   selector: 'app-chat-room',
@@ -27,8 +28,13 @@ import { ThemeService } from '../../services/theme.service';
               <button
                 class="conversation-item"
                 [class.active]="activeView === user"
-                (click)="activeView = user; errorMessage = ''"
-              >{{ user }}</button>
+                (click)="selectConversation(user)"
+              >
+                {{ user }}
+                @if (chatService.unreadPrivate().has(user)) {
+                  <span class="unread-dot" aria-label="Mensagem não lida"></span>
+                }
+              </button>
             </li>
           }
         </ul>
@@ -48,12 +54,22 @@ import { ThemeService } from '../../services/theme.service';
         @if (errorMessage) {
           <p class="error-text">{{ errorMessage }}</p>
         }
-        <ul class="message-list">
+        <ul class="message-list" #messageListEl>
           @for (msg of currentMessages(); track $index) {
-            <li class="message" [class.mine]="msg.userName === chatService.currentUserName()">
-              <strong>{{ msg.userName }}</strong>
-              @if (msg.replica) { <span class="replica-tag">({{ msg.replica }})</span> }
-              : {{ msg.message }}
+            <li class="message-row" [class.mine]="msg.userName === chatService.currentUserName()">
+              <img class="avatar" [src]="avatar.getAvatar(msg.userName)" alt="" />
+              <div class="message-col">
+                <div class="message-info">
+                  <strong>{{ msg.userName }}</strong>
+                  @if (msg.replica) {
+                    <span class="dot">·</span>
+                    <span class="replica-tag">{{ msg.replica }}</span>
+                  }
+                  <span class="dot">·</span>
+                  <span class="timestamp">{{ formatTime(msg.timestamp) }}</span>
+                </div>
+                <p class="message-bubble">{{ msg.message }}</p>
+              </div>
             </li>
           }
         </ul>
@@ -71,18 +87,62 @@ export class ChatRoomComponent implements OnInit {
   activeView: 'geral' | string = 'geral';
   errorMessage = '';
 
-  constructor(private route: ActivatedRoute, public chatService: ChatService, public theme: ThemeService) {}
+  @ViewChild('messageListEl') messageListEl!: ElementRef<HTMLElement>;
+
+  constructor(
+    private route: ActivatedRoute,
+    private router: Router,
+    public chatService: ChatService,
+    public theme: ThemeService,
+    public avatar: AvatarService
+  ) {
+    // Rola a lista de mensagens pro final sempre que uma nova mensagem chegar
+    // (na sala atual ou numa conversa privada) — sem isso, mensagens novas
+    // ficam escondidas abaixo da área visível assim que a lista cresce demais.
+    // O setTimeout(0) empurra a rolagem pro próximo tick, depois que o Angular
+    // já atualizou o DOM com o novo <li>.
+    effect(() => {
+      this.currentMessages();
+      setTimeout(() => {
+        const el = this.messageListEl?.nativeElement;
+        if (el) {
+          el.scrollTop = el.scrollHeight;
+        }
+      }, 0);
+    });
+
+    // Se a conversa que acabou de receber mensagem nova já é a que está aberta na
+    // tela, limpa o "não lida" de volta imediatamente — assim a bolinha só aparece
+    // pra conversas que a pessoa não está olhando no momento.
+    effect(() => {
+      const unread = this.chatService.unreadPrivate();
+      if (this.activeView !== 'geral' && unread.has(this.activeView)) {
+        this.chatService.markPrivateRead(this.activeView);
+      }
+    });
+  }
 
   async ngOnInit(): Promise<void> {
     this.userName = this.route.snapshot.queryParamMap.get('user') ?? '';
 
-    if (!this.chatService.isConnected && this.userName) {
+    if (!this.userName) {
+      this.router.navigate(['/']);
+      return;
+    }
+
+    if (!this.chatService.isConnected) {
       try {
         await this.chatService.connect(this.userName);
       } catch {
         this.errorMessage = 'Não foi possível conectar ao chat. Verifique se o backend está rodando.';
       }
     }
+  }
+
+  selectConversation(user: string): void {
+    this.activeView = user;
+    this.errorMessage = '';
+    this.chatService.markPrivateRead(user);
   }
 
   otherOnlineUsers(): string[] {
@@ -94,6 +154,16 @@ export class ChatRoomComponent implements OnInit {
       return this.chatService.geralMessages();
     }
     return this.chatService.privateMessages().get(this.activeView) ?? [];
+  }
+
+  formatTime(timestamp: string): string {
+    // O servidor manda o horário em UTC — formatamos aqui pra usar o fuso horário
+    // local de quem está vendo, já que o container pode rodar em outro fuso.
+    return new Date(timestamp).toLocaleTimeString('pt-BR', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false
+    });
   }
 
   async send(): Promise<void> {

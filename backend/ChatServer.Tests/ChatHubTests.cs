@@ -44,6 +44,30 @@ public class ChatHubTests
     }
 
     [Fact]
+    public async Task OnConnectedAsync_WithNoUserIdentifier_AbortsConnection_AndDoesNotJoinOrNotify()
+    {
+        var presence = new Mock<IRoomPresenceService>();
+        var groups = new Mock<IGroupManager>();
+        var clients = new Mock<IHubCallerClients>();
+
+        var context = new FakeHubCallerContext("conn-1", null);
+        var hub = new ChatHub(Mock.Of<ILogger<ChatHub>>(), BuildConfig(), presence.Object)
+        {
+            Groups = groups.Object,
+            Clients = clients.Object,
+            Context = context
+        };
+
+        await hub.OnConnectedAsync();
+
+        Assert.True(((FakeHubCallerContext)hub.Context).WasAborted);
+        groups.Verify(g => g.AddToGroupAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never());
+        clients.Verify(c => c.Caller, Times.Never());
+        clients.Verify(c => c.OthersInGroup(It.IsAny<string>()), Times.Never());
+        presence.Verify(p => p.AddUserAsync(It.IsAny<string>(), It.IsAny<string>()), Times.Never());
+    }
+
+    [Fact]
     public async Task SendMessage_BroadcastsToGeralGroup()
     {
         var groupProxy = new Mock<IClientProxy>();
@@ -61,7 +85,12 @@ public class ChatHubTests
         groupProxy.Verify(
             p => p.SendCoreAsync(
                 "ReceiveMessage",
-                It.Is<object[]>(a => (string)a[0]! == "Ana" && (string)a[1]! == "oi pessoal" && (string)a[2]! == "test-replica"),
+                It.Is<object[]>(a =>
+                    a.Length == 4 &&
+                    (string)a[0]! == "Ana" &&
+                    (string)a[1]! == "oi pessoal" &&
+                    (string)a[2]! == "test-replica" &&
+                    !string.IsNullOrEmpty((string)a[3]!)),
                 It.IsAny<CancellationToken>()),
             Times.Once);
     }
@@ -84,7 +113,12 @@ public class ChatHubTests
         targetProxy.Verify(
             p => p.SendCoreAsync(
                 "ReceivePrivateMessage",
-                It.Is<object[]>(a => (string)a[0]! == "Ana" && (string)a[1]! == "oi Bob, so pra voce" && (string)a[2]! == "test-replica"),
+                It.Is<object[]>(a =>
+                    a.Length == 4 &&
+                    (string)a[0]! == "Ana" &&
+                    (string)a[1]! == "oi Bob, so pra voce" &&
+                    (string)a[2]! == "test-replica" &&
+                    !string.IsNullOrEmpty((string)a[3]!)),
                 It.IsAny<CancellationToken>()),
             Times.Once);
     }
@@ -131,7 +165,8 @@ public class ChatHubTests
         public override IDictionary<object, object?> Items { get; } = new Dictionary<object, object?>();
         public override IFeatureCollection Features { get; } = new FeatureCollection();
         public override CancellationToken ConnectionAborted => CancellationToken.None;
-        public override void Abort() { }
+        public bool WasAborted { get; private set; }
+        public override void Abort() { WasAborted = true; }
 
         public FakeHubCallerContext(string connectionId, string? userIdentifier)
         {

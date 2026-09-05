@@ -5,7 +5,7 @@ services:
   backend1:
     build: ./backend/ChatServer
     environment:
-      - REPLICA_NAME=backend1
+      - REPLICA_NAME=Servidor A
       - REDIS_CONNECTION=redis:6379
     depends_on:
       - redis
@@ -13,7 +13,7 @@ services:
   backend2:
     build: ./backend/ChatServer
     environment:
-      - REPLICA_NAME=backend2
+      - REPLICA_NAME=Servidor B
       - REDIS_CONNECTION=redis:6379
     depends_on:
       - redis
@@ -21,7 +21,7 @@ services:
   backend3:
     build: ./backend/ChatServer
     environment:
-      - REPLICA_NAME=backend3
+      - REPLICA_NAME=Servidor C
       - REDIS_CONNECTION=redis:6379
     depends_on:
       - redis
