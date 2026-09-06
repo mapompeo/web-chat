@@ -1,5 +1,4 @@
 /* You can add global styles to this file, and also import other style files */
-@import 'primeicons/primeicons.css';
 
 :root {
   --bg: #ffffff;
@@ -39,11 +38,81 @@ body {
 }
 
 .error-text {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
   color: var(--danger);
   font-size: 0.9rem;
 }
 
-/* Theme toggle button — reused on both screens */
+/* ------------------------------------------------------------------ */
+/* Controles base (botão e campo de texto)                             */
+/* ------------------------------------------------------------------ */
+/* Escritos à mão em vez de virem de uma biblioteca de componentes: o
+   projeto só precisa destes dois, e assim eles usam as mesmas variáveis
+   de tema (--accent, --surface, --border) do resto da interface, sem um
+   segundo sistema de tema pra manter em sincronia. */
+
+.text-input {
+  width: 100%;
+  padding: 0.6rem 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--bg);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 0.95rem;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+
+  &::placeholder {
+    color: var(--text-muted);
+  }
+
+  &:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent);
+  }
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  padding: 0.6rem 1.25rem;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  font-family: inherit;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.15s ease, transform 0.1s ease, opacity 0.15s ease;
+
+  app-icon {
+    font-size: 1.05rem;
+  }
+
+  &:active:not(:disabled) {
+    transform: scale(0.97);
+  }
+
+  &:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+}
+
+.btn-primary {
+  background: var(--accent);
+  color: #fff;
+
+  &:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--accent) 85%, #000);
+  }
+}
+
+/* Theme toggle button, reused on both screens */
 .theme-toggle {
   display: inline-flex;
   align-items: center;
@@ -73,6 +142,7 @@ body {
 
 .join-page {
   min-height: 100vh;
+  min-height: 100dvh;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -99,24 +169,76 @@ body {
   box-shadow: 0 12px 32px rgba(0, 0, 0, 0.18);
 
   h1 {
-    margin: 0 0 0.25rem;
+    margin: 0;
     font-size: 1.5rem;
     font-weight: 600;
     text-align: center;
   }
 
-  input {
+  .btn {
     width: 100%;
   }
+}
 
-  p-button {
-    width: 100%;
+.join-brand {
+  align-self: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 3.25rem;
+  height: 3.25rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 15%, transparent);
+  color: var(--accent);
+  font-size: 1.6rem;
+}
 
-    .p-button {
-      width: 100%;
-      justify-content: center;
-    }
-  }
+.join-hint {
+  margin: 0;
+  text-align: center;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.join-preview {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.7rem 0.9rem;
+  border: 1px dashed var(--border);
+  border-radius: 10px;
+  background: var(--bg);
+}
+
+.join-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.join-avatar-empty {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  font-size: 1.1rem;
+}
+
+.join-preview-name {
+  font-size: 0.9rem;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.join-preview-placeholder {
+  font-weight: 400;
+  font-style: italic;
+  color: var(--text-muted);
 }
 
 /* ------------------------------------------------------------------ */
@@ -125,12 +247,16 @@ body {
 
 .chat-container {
   height: 100vh;
+  height: 100dvh;
   display: flex;
   background: var(--bg);
+  overflow-x: hidden;
 }
 
 .sidebar {
   width: 240px;
+  /* Mesmo teto de um terço da tela do visualizador, pelo mesmo motivo. */
+  max-width: 33.3333vw;
   flex-shrink: 0;
   background: var(--surface);
   border-right: 1px solid var(--border);
@@ -162,14 +288,14 @@ body {
   width: 100%;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 0.5rem;
+  gap: 0.6rem;
   text-align: left;
-  padding: 0.6rem 0.75rem;
+  padding: 0.5rem 0.6rem;
   border: none;
   border-radius: 8px;
   background: transparent;
   color: var(--text);
+  font-family: inherit;
   font-size: 0.95rem;
   cursor: pointer;
   transition: background-color 0.12s ease;
@@ -181,8 +307,75 @@ body {
   &.active {
     background: color-mix(in srgb, var(--accent) 18%, transparent);
     color: var(--accent);
-    font-weight: 600;
+
+    .conv-name {
+      font-weight: 600;
+    }
   }
+}
+
+/* O avatar da conversa e a bolinha de "online" andam juntos, então ficam num
+   wrapper posicionado; a bolinha é ancorada no canto do avatar. O mesmo
+   bloco é reaproveitado no cabeçalho da conversa aberta. */
+.conv-figure {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  flex-shrink: 0;
+}
+
+.conv-figure-room {
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  color: var(--accent);
+  font-size: 1rem;
+}
+
+.conv-avatar {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+}
+
+.conv-online-dot {
+  position: absolute;
+  right: -1px;
+  bottom: -1px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #22c55e;
+  /* A borda na cor do fundo recorta a bolinha do avatar, senão ela se mistura
+     com o desenho embaixo e vira só uma mancha verde. */
+  border: 2px solid var(--surface);
+}
+
+.conv-body {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+
+.conv-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.conv-sub {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.72rem;
+  font-weight: 400;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .unread-dot {
@@ -204,7 +397,7 @@ body {
 .conversation-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: 0.6rem;
   border-bottom: 1px solid var(--border);
   padding-bottom: 0.75rem;
   margin-bottom: 0.75rem;
@@ -213,6 +406,58 @@ body {
     margin: 0;
     font-size: 1.1rem;
     font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+.conversation-title {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  min-width: 0;
+  /* Empurra as ações (tema, visualizador) pra direita sem precisar de um
+     space-between que também afastaria o botão de menu do título no mobile. */
+  flex: 1;
+
+  /* No cabeçalho o avatar fica sobre o fundo da conversa, não sobre o da
+     sidebar; a borda que recorta a bolinha de online precisa acompanhar. */
+  .conv-online-dot {
+    border-color: var(--bg);
+  }
+}
+
+.conversation-title-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.conversation-subtitle {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.message-empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+
+  app-icon {
+    font-size: 2rem;
+    opacity: 0.5;
   }
 }
 
@@ -281,8 +526,18 @@ body {
   margin: 0;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 0.55rem 0.85rem;
+  /* Raio maior que a metade da altura de uma linha, então uma mensagem curta
+     (a maioria) sai como pílula fechada, igual ao campo de digitar e aos
+     botões. Numa mensagem de várias linhas o raio não chega à metade da
+     altura e vira um retângulo bem arredondado, que é o que se quer ali:
+     pílula de verdade num parágrafo deixaria as pontas deformadas. */
+  border-radius: 1.25rem;
+  /* O canto voltado pro avatar fica quase reto, formando o "bico" do balão.
+     Como o avatar de quem manda fica à direita e o das outras pessoas à
+     esquerda, é o canto de cima daquele lado que muda: isso amarra o balão
+     à pessoa e deixa óbvio, de relance, quem falou. */
+  border-top-left-radius: 0.3rem;
+  padding: 0.55rem 1rem;
   font-size: 0.95rem;
   line-height: 1.4;
   word-break: break-word;
@@ -292,6 +547,9 @@ body {
   background: var(--accent);
   border-color: var(--accent);
   color: #fff;
+  /* Espelha o bico pro lado direito, que é onde fica o próprio avatar. */
+  border-top-left-radius: 1.25rem;
+  border-top-right-radius: 0.3rem;
 }
 
 .input-row {
@@ -301,8 +559,9 @@ body {
   margin-top: 0.6rem;
   border-top: 1px solid var(--border);
 
-  input {
+  .text-input {
     flex: 1;
+    min-width: 0;
   }
 }
 
@@ -314,10 +573,19 @@ app-visualizer-panel {
   display: flex;
   flex-shrink: 0;
   height: 100%;
+  /* Mesmo teto de um terço da tela que o arrasto respeita. Sem isso o teto
+     valia só enquanto a alça era arrastada: a largura inicial de 500px e
+     qualquer redimensionamento da janela passavam por cima dele, e numa
+     tela de ~930px o painel ficava com mais da metade do espaço, espremendo
+     a conversa a ponto de o texto quebrar letra por letra. */
+  max-width: 33.3333vw;
 }
 
 .visualizer-panel {
-  width: 500px;
+  // A largura de verdade é controlada pelo host (app-visualizer-panel), via
+  // [style.width.px] no ChatRoomComponent; esse painel aqui dentro só
+  // preenche 100% do que o host tiver.
+  width: 100%;
   flex-shrink: 0;
   height: 100%;
   overflow-y: auto;
@@ -326,6 +594,15 @@ app-visualizer-panel {
   padding: 24px 20px;
   display: flex;
   flex-direction: column;
+
+  /* Cada peça do diagrama guarda a altura que lhe foi dada. Sem isso, num
+     painel mais baixo que o diagrama (o caso do celular, onde ele ocupa
+     metade da tela) o flex encolhe todos os filhos, e as faixas de conexão
+     achatam pra quase zero: o tracejado some e o pulso não tem por onde
+     andar. Preferimos manter as alturas e deixar o overflow-y rolar. */
+  > * {
+    flex-shrink: 0;
+  }
 
   h4 {
     margin: 0 0 20px;
@@ -355,8 +632,10 @@ app-visualizer-panel {
   text-overflow: ellipsis;
 
   .viz-icon {
-    width: 22px;
-    height: 22px;
+    /* app-icon dimensiona o SVG em 1em, então o tamanho aqui vem da fonte.
+       currentColor faz os logos do Redis e do Nginx saírem na cor de destaque
+       do projeto em vez das cores originais das marcas. */
+    font-size: 22px;
     color: var(--accent);
     flex-shrink: 0;
   }
@@ -431,7 +710,7 @@ app-visualizer-panel {
 }
 
 /* O tracejado é um pseudo-elemento centralizado via transform, não um filho
-   flex direto — um `border-left` num item `flex:1` sempre desenha na borda
+   flex direto: um `border-left` num item `flex:1` sempre desenha na borda
    ESQUERDA da coluna inteira, nunca no centro dela (a coluna ocupa a largura
    toda por causa do flex-grow, então "width:0; margin:0 auto" não tem efeito
    nenhum ali). */
@@ -454,14 +733,14 @@ app-visualizer-panel {
   border-radius: 50%;
   background: var(--accent);
   box-shadow: 0 0 8px var(--accent);
-  // Duração de cada "perna" — precisa bater com HOP_MS em
+  // Duração de cada "perna": precisa bater com HOP_MS em
   // visualizer-panel.component.ts, pra uma perna acabar bem na hora que a
   // próxima começa (o atraso de cada perna é aplicado via
   // [style.animation-delay.ms] no componente, não aqui).
   animation: viz-flow-down 0.5s ease-in-out;
   // "both" (não só "backwards"): sem isso, assim que a animação da perna
   // termina, o navegador volta o elemento pro estado NÃO animado (top:0,
-  // opacity:1 — visível, no topo da faixa) até ele ser removido do DOM,
+  // opacity:1, visível, no topo da faixa) até ele ser removido do DOM,
   // e por até alguns segundos ele fica "grudado" ali. Com "both", ele
   // mantém o valor final do keyframe (opacity:0, sumido) até realmente sair.
   animation-fill-mode: both;
@@ -543,4 +822,207 @@ app-visualizer-panel {
   display: flex;
   align-items: center;
   gap: 0.5rem;
+}
+
+/* ------------------------------------------------------------------ */
+/* Alça de redimensionar (sidebar e visualizador, só em tela grande)    */
+/* ------------------------------------------------------------------ */
+
+.resize-handle {
+  width: 6px;
+  flex-shrink: 0;
+  cursor: col-resize;
+  background: transparent;
+
+  &:hover,
+  &:active {
+    background: var(--accent);
+    opacity: 0.5;
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* Responsivo (celular)                                                 */
+/* ------------------------------------------------------------------ */
+
+.mobile-backdrop {
+  display: none;
+}
+
+.sidebar-toggle {
+  display: none;
+}
+
+@media (max-width: 900px) {
+  .mobile-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    /* Acima do visualizador (z-index 20): sem isso a sidebar e seu fundo
+       escuro empatavam com ele e perdiam por virem antes no DOM. */
+    z-index: 24;
+  }
+
+  .sidebar-toggle {
+    display: inline-flex;
+  }
+
+  /* Arrastar só existe em tela grande (os painéis viram flutuante/split-view
+     aqui, redimensionar não faria sentido); a alça some, e a largura em px
+     que o componente aplica via [style.width.px] é sobrescrita com
+     !important, senão o estilo inline (que tem prioridade normalmente)
+     ganharia da regra de media query. */
+  .resize-handle {
+    display: none;
+  }
+
+  /* No desktop a sidebar e o visualizador são colunas fixas lado a lado;
+     não cabe em tela de celular (240px + resto + 500px estoura qualquer
+     viewport de telefone). No mobile os dois viram painéis flutuantes por
+     cima do chat, escondidos por padrão e abertos só pelos botões do
+     cabeçalho. */
+  .sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    height: 100dvh;
+    width: min(280px, 80vw) !important;
+    /* Aqui a sidebar é um painel flutuante por cima do chat, não uma coluna
+       dividindo espaço com ele, então o teto de um terço da tela não vale. */
+    max-width: none;
+    z-index: 25;
+    transform: translateX(-100%);
+    transition: transform 0.25s ease;
+
+    &.mobile-open {
+      transform: translateX(0);
+    }
+  }
+
+  /* Com o visualizador aberto, ele ocupa a metade de cima da tela. A sidebar
+     desliza para a metade de BAIXO em vez da tela inteira: antes ela abria
+     por trás do visualizador, então só a faixa abaixo dele aparecia; a barra
+     estava lá, mas a lista de conversas ficava escondida atrás do painel. O
+     fundo escuro acompanha, deixando o visualizador visível e clicável em
+     cima enquanto a sidebar está aberta embaixo. */
+  .chat-container.with-visualizer {
+    .sidebar {
+      top: 50dvh;
+      height: 50dvh;
+    }
+
+    .mobile-backdrop {
+      top: 50dvh;
+    }
+  }
+
+  /* O visualizador não vira uma coluna lateral no celular (não tem espaço
+     de sobra do lado), e sim um painel fixo ocupando a metade de CIMA da
+     tela inteira, com o chat encolhendo pra metade de BAIXO enquanto ele
+     está aberto. Os dois ficam visíveis e usáveis ao mesmo tempo, diferente
+     da sidebar (que cobre e esconde o chat por baixo dela). */
+  app-visualizer-panel {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    width: 100% !important;
+    /* Ocupa a largura toda da tela aqui, então o teto de um terço não vale. */
+    max-width: none;
+    height: 50dvh;
+    z-index: 20;
+  }
+
+  /* Com três servidores lado a lado em tela de celular sobra pouquíssima
+     largura por coluna; no formato do desktop (ícone + nome + contador numa
+     linha só, com reticências) o nome era cortado exatamente na letra que
+     distingue um servidor do outro, virando "Servidor  Servidor  Servidor".
+     Aqui o cabeçalho vira coluna (nome em cima, contador embaixo), o ícone
+     sai e o texto pode quebrar em duas linhas; assim o "A"/"B"/"C" nunca
+     se perde, seja qual for a largura da tela. */
+  /* O diagrama inteiro precisa caber na metade da tela que sobra pra ele no
+     celular. Com as alturas do desktop ele estouraria e viraria uma lista
+     rolável, escondendo justamente as faixas onde a mensagem viaja, então
+     aqui tudo encolhe um pouco: menos respiro em volta, nós mais baixos e
+     faixas de conexão mais curtas (mas ainda com altura de sobra pro pulso
+     ser visível percorrendo elas). */
+  .visualizer-panel {
+    padding: 14px;
+
+    h4 {
+      margin-bottom: 10px;
+    }
+  }
+
+  .viz-node {
+    padding: 8px 12px;
+  }
+
+  .viz-connectors {
+    height: 26px;
+  }
+
+  .viz-people-row {
+    margin-top: 2px;
+  }
+
+  .viz-servers {
+    gap: 8px;
+
+    .viz-node {
+      padding: 8px 6px;
+    }
+
+    .viz-node-head {
+      justify-content: center;
+      gap: 5px;
+      font-size: 0.7rem;
+      white-space: normal;
+      text-align: center;
+
+      /* O ícone cabe de novo agora que o contador saiu da linha; só encolhe
+         junto com o texto pra sobrar largura pro nome inteiro. */
+      .viz-icon {
+        font-size: 15px;
+      }
+    }
+  }
+
+  .message-row {
+    max-width: 85%;
+  }
+
+  /* Em tela estreita o texto "Enviar" competia com o campo de mensagem pela
+     largura; o ícone sozinho já diz o que o botão faz (o aria-label cobre
+     leitores de tela). */
+  .btn-send {
+    /* Sem o rótulo e com padding igual nos quatro lados, o raio de pílula
+       fecha num círculo perfeito, do tamanho do campo ao lado. */
+    width: 2.75rem;
+    height: 2.75rem;
+    padding: 0;
+    flex-shrink: 0;
+
+    app-icon {
+      font-size: 1.2rem;
+    }
+
+    .btn-label {
+      display: none;
+    }
+  }
+
+  .conversation {
+    padding: 1rem;
+
+    &.split-view {
+      margin-top: 50dvh;
+      height: 50dvh;
+    }
+  }
+
+  .conversation-header h3 {
+    font-size: 1rem;
+  }
 }

@@ -9,7 +9,7 @@ public class ChatHub : Hub
     private const string VisualizerGroup = "Visualizador";
 
     // A topologia deste projeto é sempre fixa (é um estudo de escalonamento com 3
-    // réplicas, não um sistema com número variável de instâncias) — por isso os
+    // réplicas, não um sistema com número variável de instâncias), por isso os
     // nomes ficam hardcoded aqui, espelhando os valores de REPLICA_NAME no
     // docker-compose.yml. Se um dia mudarem, os dois lugares precisam acompanhar.
     private static readonly string[] AllReplicaNames = ["Servidor A", "Servidor B", "Servidor C"];
@@ -31,7 +31,7 @@ public class ChatHub : Hub
         if (string.IsNullOrWhiteSpace(userName))
         {
             // Sem identidade não há como manter a presença nem endereçar mensagens
-            // privadas a essa conexão — em vez de aceitar a conexão "muda" e deixar
+            // privadas a essa conexão, em vez de aceitar a conexão "muda" e deixar
             // ela transmitir como "desconhecido" (invisível na lista online), rejeita
             // de cara.
             //
@@ -39,10 +39,10 @@ public class ChatHub : Hub
             // Abort() logo depois de um SendAsync pode derrubar a conexão antes
             // da mensagem realmente sair pela rede (o await do SendAsync só
             // garante que a mensagem foi entregue pro buffer de saída do
-            // SignalR, não que já foi escrita no socket) — o cliente nunca via
+            // SignalR, não que já foi escrita no socket); o cliente nunca via
             // o "JoinRejected" e o withAutomaticReconnect() ficava tentando de
             // novo (e sendo recusado de novo) num loop silencioso. Em vez disso,
-            // só retorna sem entrar em nenhum grupo nem contar presença — é o
+            // só retorna sem entrar em nenhum grupo nem contar presença; é o
             // PRÓPRIO CLIENTE que fecha a conexão ao processar essa mensagem
             // (ver ChatService), garantindo que a entrega já aconteceu antes de
             // qualquer coisa fechar.
@@ -50,12 +50,12 @@ public class ChatHub : Hub
             return;
         }
 
-        // O nome de usuário funciona como identidade única no sistema inteiro —
+        // O nome de usuário funciona como identidade única no sistema inteiro:
         // é como o SignalR endereça mensagem privada (Clients.User(nome)) e é o
         // que aparece pra todo mundo saber quem é quem. Duas conexões com o
         // mesmo nome ficam indistinguíveis (a presença no Redis conta por nome,
         // não por conexão), então recusa a segunda tentativa de entrar com um
-        // nome já em uso agora — igual todo chat de verdade faz. Existe uma
+        // nome já em uso agora, igual todo chat de verdade faz. Existe uma
         // corrida estreita aqui (duas pessoas entrando com o mesmo nome bem no
         // mesmo instante podem ambas passar por essa checagem antes de
         // qualquer uma ser contada); aceitável pro escopo deste projeto.
@@ -67,7 +67,7 @@ public class ChatHub : Hub
         }
 
         // Marca que essa conexão realmente entrou (presença contada, grupos
-        // entrados) — OnDisconnectedAsync usa isso pra saber se tem alguma
+        // entrados); OnDisconnectedAsync usa isso pra saber se tem alguma
         // presença dela pra remover. Sem essa marca, uma conexão recusada que
         // eventualmente desconecta (o cliente chama stop() sozinho) chamaria
         // RemoveUserAsync mesmo nunca tendo chamado AddUserAsync, decrementando
@@ -92,7 +92,7 @@ public class ChatHub : Hub
         }
         // O snapshot e mandado ANTES de entrar no grupo do visualizador de proposito:
         // assim este cliente nunca pode receber um evento ao vivo (VisualizerUserConnected
-        // de outra pessoa, por exemplo) sobre algo que o snapshot ainda nao reflete —
+        // de outra pessoa, por exemplo) sobre algo que o snapshot ainda nao reflete;
         // fechando uma janela de corrida onde um evento anterior ao snapshot seria
         // descartado quando o snapshot sobrescrevesse o mapa inteiro.
         await Clients.Caller.SendAsync("VisualizerSnapshot", snapshot);
@@ -110,7 +110,7 @@ public class ChatHub : Hub
             "[{Replica}] mensagem de {User} na Sala Geral: {Message}",
             _replicaName, userName, message);
 
-        // O timestamp é gerado aqui, em UTC, e não já formatado — o navegador de quem
+        // O timestamp é gerado aqui, em UTC, e não já formatado; o navegador de quem
         // recebe é quem aplica o fuso horário local. O container pode estar rodando em
         // um fuso diferente do de quem está usando o chat, então formatar no servidor
         // mostraria a hora errada.
@@ -133,7 +133,7 @@ public class ChatHub : Hub
         await Clients.User(toUserName).SendAsync("ReceivePrivateMessage", fromUserName, message, _replicaName, timestamp);
 
         // O visualizador nunca recebe nome nem conteúdo de mensagem privada de
-        // terceiros — só os nomes das réplicas envolvidas, pra provar que o caminho
+        // terceiros, só os nomes das réplicas envolvidas, pra provar que o caminho
         // técnico existe sem expor quem conversa com quem.
         var toReplicas = await GetReplicasForUserAsync(toUserName);
         await Clients.Group(VisualizerGroup).SendAsync("VisualizerPrivateMessage", _replicaName, toReplicas);
@@ -143,7 +143,7 @@ public class ChatHub : Hub
     {
         var userName = Context.UserIdentifier;
         // Uma conexão que foi recusada em OnConnectedAsync (nome inválido ou já
-        // em uso) nunca chamou AddUserAsync nem entrou em nenhum grupo — sem
+        // em uso) nunca chamou AddUserAsync nem entrou em nenhum grupo; sem
         // essa checagem, o disconnect dela chamaria RemoveUserAsync mesmo assim
         // e decrementaria por engano a contagem de uma conexão de verdade com o
         // mesmo nome (ver Context.Items["Joined"] em OnConnectedAsync).
@@ -157,7 +157,7 @@ public class ChatHub : Hub
             await Clients.Group(GeralRoom).SendAsync("UserLeft", userName, _replicaName);
 
             // So anuncia a desconexao no visualizador quando essa era a ULTIMA conexao
-            // dessa pessoa nesta replica especifica — com varias abas na mesma replica,
+            // dessa pessoa nesta replica especifica; com varias abas na mesma replica,
             // fechar uma delas nao deve fazer a pessoa sumir do painel de todo mundo
             // enquanto ela ainda estiver conectada por outra aba na mesma replica.
             if (!remainingInReplica.Contains(userName))

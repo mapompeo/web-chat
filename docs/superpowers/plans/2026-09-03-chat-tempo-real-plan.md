@@ -4,7 +4,7 @@
 
 **Goal:** Construir um chat em tempo real (Angular + PrimeNG + SignalR) rodando em 3 réplicas
 de backend .NET sincronizadas via Redis backplane, atrás de um load balancer Nginx, tudo
-orquestrado por Docker Compose — projeto de estudo focado em Docker e WebSocket em escala.
+orquestrado por Docker Compose: projeto de estudo focado em Docker e WebSocket em escala.
 
 **Architecture:** Browser → Nginx (proxy WebSocket + serve dos arquivos estáticos do Angular)
 → 3 réplicas idênticas de um backend ASP.NET Core/SignalR → Redis (backplane de mensagens +
@@ -19,19 +19,19 @@ pelo Redis.
 ## Global Constraints
 
 - 3 réplicas de backend, nomeadas explicitamente `backend1`, `backend2`, `backend3` (mesma
-  imagem Docker) — não usar `deploy.replicas` (decisão do design, para logs identificáveis).
-- Sem autenticação e sem persistência de mensagens — fora de escopo deste MVP.
+  imagem Docker): não usar `deploy.replicas` (decisão do design, para logs identificáveis).
+- Sem autenticação e sem persistência de mensagens, fora de escopo deste MVP.
 - Frontend: Angular + PrimeNG, tema **Aura**.
-- Load balancer: Nginx, **sem sticky sessions** — a sincronização é responsabilidade do
+- Load balancer: Nginx, **sem sticky sessions**, a sincronização é responsabilidade do
   backplane Redis, não do roteamento.
-- Todo o stack roda localmente via `docker compose` — sem deploy em nuvem neste projeto.
+- Todo o stack roda localmente via `docker compose`, sem deploy em nuvem neste projeto.
 - Convenção do usuário (global, `~/.claude/CLAUDE.md`): nunca hardcodar porta de dev server.
   Ao rodar `ng serve` localmente (fora do Docker Compose), obter a porta livre via
   `~/scripts/port-for-worktree.sh` e informar a URL final usada.
 
 ---
 
-## Task 1: Backend .NET — ChatHub com salas, presença e testes
+## Task 1: Backend .NET, ChatHub com salas, presença e testes
 
 **Files:**
 - Create: `backend/ChatServer.sln`
@@ -188,7 +188,7 @@ public class ChatHubTests
 - [ ] **Step 5: Rodar os testes e confirmar que falham**
 
 Run: `cd backend && dotnet test`
-Expected: FALHA de compilação — `ChatHub` não existe ainda no namespace `ChatServer.Hubs`.
+Expected: FALHA de compilação; `ChatHub` não existe ainda no namespace `ChatServer.Hubs`.
 
 - [ ] **Step 6: Implementar o ChatHub (mínimo para os dois testes passarem)**
 
@@ -256,9 +256,9 @@ public class ChatHub : Hub
 - [ ] **Step 7: Rodar os testes e confirmar que passam**
 
 Run: `cd backend && dotnet test`
-Expected: PASS — os 2 testes em `ChatHubTests` verdes.
+Expected: PASS, os 2 testes em `ChatHubTests` verdes.
 
-- [ ] **Step 8: Implementação em memória da presença (temporária — Task 3 troca por Redis)**
+- [ ] **Step 8: Implementação em memória da presença (temporária, Task 3 troca por Redis)**
 
 `backend/ChatServer/Services/InMemoryRoomPresenceService.cs`:
 
@@ -297,7 +297,7 @@ public class InMemoryRoomPresenceService : IRoomPresenceService
 }
 ```
 
-- [ ] **Step 9: Program.cs — subir o servidor com o Hub mapeado**
+- [ ] **Step 9: Program.cs, subir o servidor com o Hub mapeado**
 
 `backend/ChatServer/Program.cs`:
 
@@ -446,7 +446,7 @@ ENTRYPOINT ["dotnet", "ChatServer.dll"]
 
 - [ ] **Step 2: `.dockerignore`**
 
-`backend/ChatServer/.dockerignore` (deve ficar na raiz do contexto de build — `cd backend/ChatServer && docker build .` — não em `backend/`, senão o Docker nunca a encontra):
+`backend/ChatServer/.dockerignore` (deve ficar na raiz do contexto de build, ou seja `cd backend/ChatServer && docker build .`, não em `backend/`, senão o Docker nunca a encontra):
 
 ```
 **/bin/
@@ -473,7 +473,7 @@ git commit -m "chore: dockerizar o backend"
 
 ---
 
-## Task 3: Redis — backplane do SignalR + presença persistida no Redis
+## Task 3: Redis, backplane do SignalR + presença persistida no Redis
 
 **Files:**
 - Create: `backend/ChatServer/Services/RedisRoomPresenceService.cs`
@@ -587,7 +587,7 @@ app.MapHub<ChatHub>("/chatHub");
 app.Run();
 ```
 
-- [ ] **Step 5: docker-compose.yml — Redis + 1 backend (ainda sem múltiplas réplicas)**
+- [ ] **Step 5: docker-compose.yml, Redis + 1 backend (ainda sem múltiplas réplicas)**
 
 `docker-compose.yml` (raiz do repo):
 
@@ -623,7 +623,7 @@ depois rode:
 ```bash
 docker compose exec redis redis-cli SMEMBERS room:sala-1:users
 ```
-Expected: o nome do usuário que você usou aparece na saída — prova de que a presença está
+Expected: o nome do usuário que você usou aparece na saída, prova de que a presença está
 sendo armazenada no Redis, não mais em memória do processo.
 
 - [ ] **Step 8: Commit**
@@ -643,7 +643,7 @@ git commit -m "feat: presenca e backplane via Redis"
 **Interfaces:**
 - Consumes: serviço `backend` único (Task 3), variáveis `REPLICA_NAME`/`REDIS_CONNECTION`.
 - Produces: serviços `backend1`, `backend2`, `backend3` (mesma imagem), acessíveis
-  diretamente nas portas `5001`, `5002`, `5003` (temporário — a Task 5 remove esse acesso
+  diretamente nas portas `5001`, `5002`, `5003` (temporário, a Task 5 remove esse acesso
   direto ao introduzir o Nginx).
 
 - [ ] **Step 1: Substituir o serviço `backend` único por 3 réplicas nomeadas**
@@ -686,7 +686,7 @@ services:
       - redis
 ```
 
-- [ ] **Step 2: Validar a sincronização entre réplicas — o "aha moment" do projeto**
+- [ ] **Step 2: Validar a sincronização entre réplicas, o "aha moment" do projeto**
 
 Run: `docker compose up --build`
 
@@ -695,14 +695,14 @@ Abra `http://localhost:5002/test.html` na Aba B (entre como "Bob" na mesma sala)
 Mande uma mensagem da Aba A.
 
 Expected:
-- A mensagem aparece na Aba B mesmo estando em uma réplica diferente — e a prova de
+- A mensagem aparece na Aba B mesmo estando em uma réplica diferente, e a prova de
   que ela veio via Redis está no próprio conteúdo: a linha em `test.html` mostra
   `[backend1] Ana: oi`, ou seja, a Aba B (conectada na `backend2`) recebeu uma
   mensagem marcada com o nome de uma réplica diferente da sua. Isso só é possível
   porque a mensagem saiu da `backend1`, foi publicada no Redis, e a `backend2`
   repassou pro seu cliente.
 - Rodando `docker compose logs -f`, você vê em `backend1` as linhas de "entrou na
-  sala" (Ana) e "mensagem de Ana" — mas **não** espere uma linha equivalente em
+  sala" (Ana) e "mensagem de Ana", mas **não** espere uma linha equivalente em
   `backend2` para essa mensagem: a entrega via Redis backplane acontece dentro da
   biblioteca do SignalR (`AddStackExchangeRedis`), fora do código do Hub, então não
   há (e não precisa haver) um log custom nesse ponto. O log do lado que *recebeu a
@@ -813,7 +813,7 @@ services:
 
 Run: `docker compose up --build`
 
-Abra `http://localhost/test.html` em duas abas (agora sem especificar porta de réplica —
+Abra `http://localhost/test.html` em duas abas (agora sem especificar porta de réplica;
 o Nginx decide). Entre na mesma sala nas duas, mande mensagens.
 
 Expected: chat funciona normalmente; em `docker compose logs -f` você vê as duas conexões
@@ -907,7 +907,7 @@ export class ChatService {
     this.connection = new signalR.HubConnectionBuilder()
       // skipNegotiation + WebSockets-only: sem isso, o cliente faz um POST
       // /negotiate separado antes do upgrade de WebSocket, e sem sticky sessions
-      // o Nginx pode mandar cada requisição pra uma réplica diferente — a segunda
+      // o Nginx pode mandar cada requisição pra uma réplica diferente, a segunda
       // rejeita a conexão porque o connectionId só existe na réplica que negociou.
       // Pulando a negociação, a conexão vira uma única requisição atômica.
       .withUrl('/chatHub', {
@@ -984,7 +984,7 @@ git commit -m "chore: scaffold do Angular com PrimeNG e ChatService"
 **Interfaces:**
 - Consumes: `ChatService.connect()` e `ChatService.joinRoom()` (Task 6).
 - Produces: rota `''` (raiz) renderizando `JoinRoomComponent`; navega para
-  `/room/:room?user=<userName>` ao entrar — contrato de rota consumido pela Task 8.
+  `/room/:room?user=<userName>` ao entrar, contrato de rota consumido pela Task 8.
 
 - [ ] **Step 1: Criar o componente de entrada**
 
@@ -1051,7 +1051,7 @@ npx ng serve --port $PORT --proxy-config proxy.conf.json
 Informe ao usuário a porta escolhida e a URL (`http://localhost:$PORT`). Abra essa URL,
 preencha nome e sala, clique em "Entrar".
 
-Expected: navega para `/room/<sala>`, sem tela ainda (Task 8 implementa) — mas sem erros de
+Expected: navega para `/room/<sala>`, sem tela ainda (Task 8 implementa), mas sem erros de
 console e a conexão SignalR abre com sucesso (verificável na aba Network do navegador).
 
 - [ ] **Step 4: Commit**
@@ -1183,7 +1183,7 @@ git commit -m "feat: tela da sala de chat com mensagens e presenca online"
 **Interfaces:**
 - Consumes: build de produção do Angular (Task 6-8), `nginx.conf` da Task 5.
 - Produces: `http://localhost/` servindo o Angular real (não mais o `test.html`), com
-  `/chatHub` proxyado para as 3 réplicas — stack 100% containerizado.
+  `/chatHub` proxyado para as 3 réplicas, stack 100% containerizado.
 
 - [ ] **Step 1: Dockerfile multi-stage do Nginx (build do Angular + imagem final)**
 
@@ -1215,7 +1215,7 @@ events {}
 
 http {
     # Sem isso, o Nginx serve os .js do Angular como application/octet-stream
-    # (o tipo genérico de fallback), e o navegador recusa executar o módulo ES —
+    # (o tipo genérico de fallback), e o navegador recusa executar o módulo ES:
     # a página carrega em branco mesmo com todas as respostas retornando 200.
     include /etc/nginx/mime.types;
     default_type application/octet-stream;
@@ -1249,7 +1249,7 @@ http {
 
 - [ ] **Step 3: Trocar o serviço Nginx no docker-compose para buildar a partir do Dockerfile**
 
-`docker-compose.yml` (trecho a substituir — o serviço `nginx`):
+`docker-compose.yml` (trecho a substituir, o serviço `nginx`):
 
 ```yaml
   nginx:
@@ -1268,7 +1268,7 @@ http {
 
 Run: `docker compose up --build`
 
-Abra `http://localhost/` (sem mais `test.html` — agora é o Angular real) em duas abas.
+Abra `http://localhost/` (sem mais `test.html`, agora é o Angular real) em duas abas.
 
 Expected: tela de entrada estilizada com PrimeNG, entra na sala, chat funciona em tempo
 real entre as abas.
@@ -1301,7 +1301,7 @@ Run: `docker compose up --build`
 3. Mande mensagens nos dois sentidos, confirme entrega em tempo real e atualização da
    lista de online.
 4. Descubra em qual réplica uma das abas está conectada (pelos logs) e rode
-   `docker compose stop <essa-replica>`. Confirme que só aquela aba perde a conexão — a
+   `docker compose stop <essa-replica>`. Confirme que só aquela aba perde a conexão, a
    outra continua funcionando normalmente.
 
 - [ ] **Step 2: Escrever o README**
@@ -1309,7 +1309,7 @@ Run: `docker compose up --build`
 `README.md`:
 
 ```markdown
-# Web Chat — Docker + SignalR + Redis
+# Web Chat: Docker + SignalR + Redis
 
 Projeto de estudo: chat em tempo real com múltiplas réplicas de backend sincronizadas via
 Redis pub/sub (SignalR backplane), atrás de um load balancer Nginx, tudo orquestrado por
@@ -1332,7 +1332,7 @@ Abra `http://localhost/`.
 docker compose logs -f
 ```
 
-Abra o chat em duas abas/perfis diferentes, entre na mesma sala e mande mensagens — os
+Abra o chat em duas abas/perfis diferentes, entre na mesma sala e mande mensagens, os
 logs mostram o caminho de cada mensagem entre réplicas via Redis (prefixo `[backendN]`
 identifica qual réplica processou cada evento).
 
@@ -1349,7 +1349,7 @@ identifica qual réplica processou cada evento).
 - Sem autenticação e sem persistência de histórico de mensagens.
 - Se uma réplica cair, a reconexão automática do SignalR pode conectar o cliente em outra
   réplica, mas ele não reentra automaticamente na sala (`JoinRoom` não é reinvocado no
-  evento de reconexão) — melhoria possível para uma iteração futura.
+  evento de reconexão), melhoria possível para uma iteração futura.
 - Rodado apenas localmente; sem deploy em nuvem.
 
 ## Trabalho futuro

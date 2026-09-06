@@ -1,11 +1,16 @@
 <!doctype html>
-<html lang="en">
+<html lang="pt-BR">
 <head>
   <meta charset="utf-8">
-  <title>Frontend</title>
+  <title>Web Chat em tempo real</title>
+  <meta name="description" content="Chat em tempo real por WebSocket, escalado em três réplicas .NET/SignalR atrás de um load balancer Nginx e sincronizadas por Redis, com um visualizador ao vivo do caminho de cada mensagem.">
   <base href="/">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <link rel="icon" type="image/x-icon" href="favicon.ico">
+  <!-- Pinta a barra do navegador no celular com a cor do tema, pra ela não
+       destoar do topo da página. -->
+  <meta name="theme-color" content="#0e0f11" media="(prefers-color-scheme: dark)">
+  <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
   <script>
     (function () {
       try {

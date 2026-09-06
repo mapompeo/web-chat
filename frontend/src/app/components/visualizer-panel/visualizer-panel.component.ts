@@ -1,12 +1,13 @@
 import { Component } from '@angular/core';
 import { ChatService, VisualizerPulse } from '../../services/chat.service';
 import { AvatarService } from '../../services/avatar.service';
+import { IconComponent } from '../icon/icon.component';
 
 type PulseDirection = 'up' | 'down';
 type PulseLeg = { pulse: VisualizerPulse; direction: PulseDirection; stage: number; row: 1 | 2 | 3 };
 
 // Cada "perna" da jornada dura o mesmo tempo, e elas acontecem em sequência
-// (perna 1 termina, perna 2 começa) — não todas de uma vez. Precisa bater com
+// (perna 1 termina, perna 2 começa), não todas de uma vez. Precisa bater com
 // a duração da animação declarada em @keyframes viz-flow-down/viz-flow-up no
 // styles.scss (0.5s) e com o tempo de vida de cada pulso no ChatService.
 const HOP_MS = 500;
@@ -14,13 +15,14 @@ const HOP_MS = 500;
 @Component({
   selector: 'app-visualizer-panel',
   standalone: true,
+  imports: [IconComponent],
   template: `
     <div class="visualizer-panel">
       <h4>Arquitetura ao vivo</h4>
 
       <div class="viz-node">
         <div class="viz-node-head">
-          <svg class="viz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6c0-1.1 3.6-2 8-2s8 .9 8 2-3.6 2-8 2-8-.9-8-2Z"/><path d="M4 6v12c0 1.1 3.6 2 8 2s8-.9 8-2V6"/><path d="M4 12c0 1.1 3.6 2 8 2s8-.9 8-2"/></svg>
+          <app-icon class="viz-icon" name="redis" />
           Redis
           <span class="viz-count">backplane</span>
         </div>
@@ -45,9 +47,8 @@ const HOP_MS = 500;
         @for (replica of replicaNames; track replica) {
           <div class="viz-node">
             <div class="viz-node-head">
-              <svg class="viz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="7" rx="1"/><rect x="3" y="13" width="18" height="7" rx="1"/><circle cx="7" cy="7.5" r="0.6" fill="currentColor"/><circle cx="7" cy="16.5" r="0.6" fill="currentColor"/></svg>
+              <app-icon class="viz-icon" name="server" />
               {{ replica }}
-              <span class="viz-count">{{ usersIn(replica).length }}</span>
             </div>
           </div>
         }
@@ -72,7 +73,7 @@ const HOP_MS = 500;
 
       <div class="viz-node">
         <div class="viz-node-head">
-          <svg class="viz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="5" r="2"/><path d="M12 7v4M12 11 L6 15 M12 11 L18 15"/><circle cx="6" cy="17" r="2"/><circle cx="18" cy="17" r="2"/></svg>
+          <app-icon class="viz-icon" name="nginx" />
           Nginx
           <span class="viz-count">load balancer</span>
         </div>
@@ -118,7 +119,7 @@ const HOP_MS = 500;
   `
 })
 export class VisualizerPanelComponent {
-  // Mesma lista fixa que o backend usa em ChatHub.AllReplicaNames — ver
+  // Mesma lista fixa que o backend usa em ChatHub.AllReplicaNames. Ver
   // docs/superpowers/specs/2026-09-05-visualizador-arquitetura-design.md
   // pela explicação de por que isso é hardcoded nos dois lados.
   readonly replicaNames = ['Servidor A', 'Servidor B', 'Servidor C'];
@@ -142,14 +143,14 @@ export class VisualizerPanelComponent {
   // e desce do Redis até cada réplica ativa (pernas 3-5).
   //
   // IMPORTANTE: a própria réplica de quem mandou também recebe a entrega
-  // pelas pernas 3-5, igual qualquer outra réplica ativa — não existe atalho
+  // pelas pernas 3-5, igual qualquer outra réplica ativa; não existe atalho
   // "entrega local direto, sem Redis". Conferimos isso no código-fonte real
   // do RedisHubLifetimeManager (decompilado do pacote instalado): SendGroupAsync
   // só publica no Redis; cada servidor, INCLUSIVE o que mandou, só entrega pros
   // próprios clientes locais quando recebe a publicação de volta via sua
   // própria assinatura (SubscribeToGroupAsync). Ou seja, mesmo quem manda
   // recebe a própria mensagem através de uma ida e volta pelo Redis, igual
-  // todo mundo mais — por isso a réplica de origem não é excluída da entrega.
+  // todo mundo mais. Por isso a réplica de origem não é excluída da entrega.
   private legsFor(pulse: VisualizerPulse, replica: string): PulseLeg[] {
     if (pulse.kind === 'connect' || pulse.kind === 'disconnect') {
       if (pulse.replica !== replica) return [];
@@ -178,11 +179,11 @@ export class VisualizerPanelComponent {
     return legs;
   }
 
-  // Só se aplica a mensagem geral — mensagem privada é anônima de propósito
+  // Só se aplica a mensagem geral; mensagem privada é anônima de propósito
   // (não carrega nome de ninguém), então não tem como saber quem destacar ali.
   // Quem mandou nunca esmaece; todo mundo mais, em qualquer réplica envolvida
   // na jornada (origem ou destino), fica esmaecido enquanto a mensagem ainda
-  // está "no ar" — assim que o pulso termina e some da tela, todo mundo volta
+  // está "no ar"; assim que o pulso termina e some da tela, todo mundo volta
   // ao normal.
   isDimmed(person: string, replica: string): boolean {
     for (const pulse of this.chatService.visualizerPulses()) {

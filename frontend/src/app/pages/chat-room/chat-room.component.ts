@@ -1,28 +1,42 @@
-import { Component, OnInit, ViewChild, ElementRef, effect } from '@angular/core';
+import { Component, OnInit, ViewChild, ElementRef, effect, signal } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
-import { InputTextModule } from 'primeng/inputtext';
-import { ButtonModule } from 'primeng/button';
 import { ChatMessage, ChatService } from '../../services/chat.service';
 import { ThemeService } from '../../services/theme.service';
 import { AvatarService } from '../../services/avatar.service';
 import { VisualizerPanelComponent } from '../../components/visualizer-panel/visualizer-panel.component';
+import { IconComponent } from '../../components/icon/icon.component';
 
 @Component({
   selector: 'app-chat-room',
   standalone: true,
-  imports: [FormsModule, InputTextModule, ButtonModule, VisualizerPanelComponent],
+  imports: [FormsModule, VisualizerPanelComponent, IconComponent],
   template: `
-    <div class="chat-container">
-      <aside class="sidebar">
+    <!-- with-visualizer marca o container inteiro, não só o <main>, porque no
+         celular a sidebar também precisa saber que o visualizador está ocupando
+         a metade de cima da tela, e CSS não tem como olhar para um irmão que
+         vem depois dela no DOM. -->
+    <div class="chat-container" [class.with-visualizer]="showVisualizer">
+      @if (showSidebarMobile) {
+        <div class="mobile-backdrop" (click)="showSidebarMobile = false"></div>
+      }
+      <aside class="sidebar" [class.mobile-open]="showSidebarMobile" [style.width.px]="sidebarWidth()">
         <h4>Conversas</h4>
         <ul class="conversation-list">
           <li>
             <button
               class="conversation-item"
               [class.active]="activeView === 'geral'"
-              (click)="activeView = 'geral'; errorMessage = ''"
-            >Sala Geral</button>
+              (click)="activeView = 'geral'; errorMessage = ''; showSidebarMobile = false"
+            >
+              <span class="conv-figure conv-figure-room">
+                <app-icon name="users" />
+              </span>
+              <span class="conv-body">
+                <span class="conv-name">Sala Geral</span>
+                <span class="conv-sub">{{ chatService.onlineUsers().length }} online</span>
+              </span>
+            </button>
           </li>
           @for (user of otherOnlineUsers(); track user) {
             <li>
@@ -31,7 +45,17 @@ import { VisualizerPanelComponent } from '../../components/visualizer-panel/visu
                 [class.active]="activeView === user"
                 (click)="selectConversation(user)"
               >
-                {{ user }}
+                <span class="conv-figure">
+                  <img class="conv-avatar" [src]="avatar.getAvatar(user)" alt="" />
+                  <span class="conv-online-dot" aria-hidden="true"></span>
+                </span>
+                <span class="conv-body">
+                  <span class="conv-name">{{ user }}</span>
+                  <span class="conv-sub">
+                    <app-icon name="lock" />
+                    conversa privada
+                  </span>
+                </span>
                 @if (chatService.unreadPrivate().has(user)) {
                   <span class="unread-dot" aria-label="Mensagem não lida"></span>
                 }
@@ -40,9 +64,46 @@ import { VisualizerPanelComponent } from '../../components/visualizer-panel/visu
           }
         </ul>
       </aside>
-      <main class="conversation">
+      <div
+        class="resize-handle"
+        (mousedown)="startResize('sidebar', $event)"
+        aria-hidden="true"
+      ></div>
+      <main class="conversation" [class.split-view]="showVisualizer">
         <div class="conversation-header">
-          <h3>{{ activeView === 'geral' ? 'Sala Geral' : 'Privado com ' + activeView }}</h3>
+          <button
+            class="theme-toggle sidebar-toggle"
+            type="button"
+            (click)="showSidebarMobile = !showSidebarMobile"
+            [attr.aria-label]="showSidebarMobile ? 'Esconder conversas' : 'Mostrar conversas'"
+          >
+            <app-icon name="menu" />
+          </button>
+          <div class="conversation-title">
+            @if (activeView === 'geral') {
+              <span class="conv-figure conv-figure-room">
+                <app-icon name="users" />
+              </span>
+              <div class="conversation-title-text">
+                <h3>Sala Geral</h3>
+                <span class="conversation-subtitle">
+                  {{ chatService.onlineUsers().length }} pessoa{{ chatService.onlineUsers().length === 1 ? '' : 's' }} online
+                </span>
+              </div>
+            } @else {
+              <span class="conv-figure">
+                <img class="conv-avatar" [src]="avatar.getAvatar(activeView)" alt="" />
+                <span class="conv-online-dot" aria-hidden="true"></span>
+              </span>
+              <div class="conversation-title-text">
+                <h3>{{ activeView }}</h3>
+                <span class="conversation-subtitle">
+                  <app-icon name="lock" />
+                  conversa privada
+                </span>
+              </div>
+            }
+          </div>
           <div class="header-actions">
             <button
               class="theme-toggle"
@@ -50,7 +111,7 @@ import { VisualizerPanelComponent } from '../../components/visualizer-panel/visu
               (click)="showVisualizer = !showVisualizer"
               [attr.aria-label]="showVisualizer ? 'Esconder visualizador de arquitetura' : 'Mostrar visualizador de arquitetura'"
             >
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:1rem;height:1rem;"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M15 3v18"/></svg>
+              <app-icon name="layout" />
             </button>
             <button
               class="theme-toggle"
@@ -58,14 +119,23 @@ import { VisualizerPanelComponent } from '../../components/visualizer-panel/visu
               (click)="theme.toggle()"
               [attr.aria-label]="theme.mode() === 'dark' ? 'Mudar para tema claro' : 'Mudar para tema escuro'"
             >
-              <i class="pi" [class.pi-sun]="theme.mode() === 'dark'" [class.pi-moon]="theme.mode() === 'light'"></i>
+              <app-icon [name]="theme.mode() === 'dark' ? 'sun' : 'moon'" />
             </button>
           </div>
         </div>
         @if (errorMessage || chatService.joinError()) {
-          <p class="error-text">{{ errorMessage || chatService.joinError() }}</p>
+          <p class="error-text">
+            <app-icon name="lock" />
+            {{ errorMessage || chatService.joinError() }}
+          </p>
         }
         <ul class="message-list" #messageListEl>
+          @if (currentMessages().length === 0) {
+            <li class="message-empty">
+              <app-icon name="message" />
+              <span>Nenhuma mensagem ainda. Diga alguma coisa!</span>
+            </li>
+          }
           @for (msg of currentMessages(); track $index) {
             <li class="message-row" [class.mine]="msg.userName === chatService.currentUserName()">
               <img class="avatar" [src]="avatar.getAvatar(msg.userName)" alt="" />
@@ -81,12 +151,31 @@ import { VisualizerPanelComponent } from '../../components/visualizer-panel/visu
           }
         </ul>
         <div class="input-row">
-          <input pInputText [(ngModel)]="draft" placeholder="Mensagem" (keyup.enter)="send()" />
-          <p-button label="Enviar" (onClick)="send()" />
+          <input
+            class="text-input"
+            [(ngModel)]="draft"
+            [placeholder]="activeView === 'geral' ? 'Mensagem para a sala' : 'Mensagem para ' + activeView"
+            (keyup.enter)="send()"
+          />
+          <button
+            class="btn btn-primary btn-send"
+            type="button"
+            (click)="send()"
+            [disabled]="!draft.trim()"
+            aria-label="Enviar mensagem"
+          >
+            <app-icon name="send" />
+            <span class="btn-label">Enviar</span>
+          </button>
         </div>
       </main>
       @if (showVisualizer) {
-        <app-visualizer-panel />
+        <div
+          class="resize-handle"
+          (mousedown)="startResize('visualizer', $event)"
+          aria-hidden="true"
+        ></div>
+        <app-visualizer-panel [style.width.px]="visualizerWidth()" />
       }
     </div>
   `
@@ -96,7 +185,19 @@ export class ChatRoomComponent implements OnInit {
   draft = '';
   activeView: 'geral' | string = 'geral';
   errorMessage = '';
-  showVisualizer = true;
+  // No celular o visualizador começa escondido (é uma tela cheia por cima do
+  // chat, ruim de abrir de cara); no desktop continua começando aberto,
+  // já que é a peça que mais mostra o diferencial técnico do projeto.
+  showVisualizer = window.innerWidth > 900;
+  showSidebarMobile = false;
+
+  // Sinais (não campos comuns) de propósito: o arrasto é feito com
+  // document.addEventListener, fora do binding normal do Angular; usar sinal
+  // e ler ele direto no template garante que a tela atualiza a cada movimento
+  // do mouse, sem depender de detecção de mudança acontecer por acaso.
+  readonly sidebarWidth = signal(240);
+  readonly visualizerWidth = signal(500);
+  private resizing: 'sidebar' | 'visualizer' | null = null;
 
   @ViewChild('messageListEl') messageListEl!: ElementRef<HTMLElement>;
 
@@ -108,7 +209,7 @@ export class ChatRoomComponent implements OnInit {
     public avatar: AvatarService
   ) {
     // Rola a lista de mensagens pro final sempre que uma nova mensagem chegar
-    // (na sala atual ou numa conversa privada) — sem isso, mensagens novas
+    // (na sala atual ou numa conversa privada); sem isso, mensagens novas
     // ficam escondidas abaixo da área visível assim que a lista cresce demais.
     // O setTimeout(0) empurra a rolagem pro próximo tick, depois que o Angular
     // já atualizou o DOM com o novo <li>.
@@ -123,7 +224,7 @@ export class ChatRoomComponent implements OnInit {
     });
 
     // Se a conversa que acabou de receber mensagem nova já é a que está aberta na
-    // tela, limpa o "não lida" de volta imediatamente — assim a bolinha só aparece
+    // tela, limpa o "não lida" de volta imediatamente; assim a bolinha só aparece
     // pra conversas que a pessoa não está olhando no momento.
     effect(() => {
       const unread = this.chatService.unreadPrivate();
@@ -132,6 +233,39 @@ export class ChatRoomComponent implements OnInit {
       }
     });
   }
+
+  // Arrastável só faz sentido em tela grande, onde os painéis são colunas
+  // fixas de verdade; no celular eles viram painel flutuante/split-view (ver
+  // styles.scss), e a alça de arrasto fica escondida lá (display:none), então
+  // isso nunca dispara no mobile mesmo sem checar aqui.
+  startResize(which: 'sidebar' | 'visualizer', event: MouseEvent): void {
+    event.preventDefault();
+    this.resizing = which;
+    document.body.style.cursor = 'col-resize';
+    document.addEventListener('mousemove', this.onResizeMove);
+    document.addEventListener('mouseup', this.onResizeEnd);
+  }
+
+  private readonly onResizeMove = (event: MouseEvent): void => {
+    // O máximo de cada painel é 1/3 da largura da tela, recalculado a cada
+    // movimento porque a janela pode ter sido redimensionada nesse meio tempo.
+    const maxWidth = window.innerWidth / 3;
+    if (this.resizing === 'sidebar') {
+      const next = Math.min(Math.max(event.clientX, 180), maxWidth);
+      this.sidebarWidth.set(next);
+    } else if (this.resizing === 'visualizer') {
+      const fromRightEdge = window.innerWidth - event.clientX;
+      const next = Math.min(Math.max(fromRightEdge, 280), maxWidth);
+      this.visualizerWidth.set(next);
+    }
+  };
+
+  private readonly onResizeEnd = (): void => {
+    this.resizing = null;
+    document.body.style.cursor = '';
+    document.removeEventListener('mousemove', this.onResizeMove);
+    document.removeEventListener('mouseup', this.onResizeEnd);
+  };
 
   async ngOnInit(): Promise<void> {
     this.userName = this.route.snapshot.queryParamMap.get('user') ?? '';
@@ -154,6 +288,7 @@ export class ChatRoomComponent implements OnInit {
     this.activeView = user;
     this.errorMessage = '';
     this.chatService.markPrivateRead(user);
+    this.showSidebarMobile = false;
   }
 
   otherOnlineUsers(): string[] {
@@ -168,7 +303,7 @@ export class ChatRoomComponent implements OnInit {
   }
 
   formatTime(timestamp: string): string {
-    // O servidor manda o horário em UTC — formatamos aqui pra usar o fuso horário
+    // O servidor manda o horário em UTC; formatamos aqui pra usar o fuso horário
     // local de quem está vendo, já que o container pode rodar em outro fuso.
     return new Date(timestamp).toLocaleTimeString('pt-BR', {
       hour: '2-digit',
@@ -192,7 +327,7 @@ export class ChatRoomComponent implements OnInit {
     } catch {
       this.errorMessage = 'Não foi possível enviar a mensagem.';
       // só restaura o rascunho se a pessoa não tiver digitado algo novo enquanto
-      // o envio falhava — evita atropelar um rascunho mais recente (ver ciclo
+      // o envio falhava; evita atropelar um rascunho mais recente (ver ciclo
       // anterior, revisão final, achado "sobrescrita de draft em corrida rara").
       if (this.draft === '') {
         this.draft = messageToSend;

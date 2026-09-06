@@ -1,4 +1,4 @@
-# Sala Geral, Chat Privado, .NET 10 e Redesign Visual — Implementation Plan
+# Sala Geral, Chat Privado, .NET 10 e Redesign Visual: Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -8,7 +8,7 @@ backend pra .NET 10, e redesenhar o frontend com tema escuro por padrão (estilo
 Minimal/Linear) e alternância pra tema claro.
 
 **Architecture:** O chat privado reaproveita o backplane Redis já configurado, mas usa
-`Clients.User(...)` do SignalR em vez de grupos/salas — isso exige que a conexão se
+`Clients.User(...)` do SignalR em vez de grupos/salas, isso exige que a conexão se
 identifique (via query string) *no momento de conectar*, não depois. A Sala Geral vira
 automática: toda conexão identificada entra nela sozinha, sem chamada explícita de
 "entrar".
@@ -20,21 +20,21 @@ Angular 22 (control flow nativo `@if`/`@for`, sem `CommonModule`), PrimeNG.
 
 ## Global Constraints
 
-- .NET 10 (upgrado de .NET 9 — instalar o SDK se não estiver disponível).
-- Sala Geral é única e fixa — substitui completamente o modelo de nome de sala
+- .NET 10 (upgrado de .NET 9, instalar o SDK se não estiver disponível).
+- Sala Geral é única e fixa, substitui completamente o modelo de nome de sala
   customizado. Ninguém "entra" nela explicitamente; toda conexão identificada já está
   nela.
-- Chat privado não usa salas/grupos — usa `Clients.User(toUserName)`, exige
+- Chat privado não usa salas/grupos, usa `Clients.User(toUserName)`, exige
   `IUserIdProvider` lendo o usuário da query string da conexão (`/chatHub?user=...`).
-- Sem histórico de mensagens (Geral ou privado) — mesma filosofia efêmera de sempre.
-- Sem autenticação real — "usuário" continua sendo só o nome digitado.
+- Sem histórico de mensagens (Geral ou privado), mesma filosofia efêmera de sempre.
+- Sem autenticação real, "usuário" continua sendo só o nome digitado.
 - Tema escuro é o padrão; alternância pra claro precisa persistir no navegador
   (`localStorage`). Paleta exata:
   - Escuro: fundo `#0e0f11`, superfície `#17181b`, borda `#26272b`, texto `#e4e4e7`,
     texto secundário `#a1a1aa`, acento `#5b8cff`.
   - Claro: fundo `#ffffff`, superfície `#f4f4f5`, borda `#e4e4e7`, texto `#18181b`,
     texto secundário `#71717a`, acento `#3b6fe0`.
-- Convenção do usuário (global): nunca hardcodar porta de dev server — usar
+- Convenção do usuário (global): nunca hardcodar porta de dev server, usar
   `~/scripts/port-for-worktree.sh` antes de `ng serve` local.
 
 ---
@@ -106,7 +106,7 @@ git commit -m "chore: atualizar backend para .NET 10"
 **Interfaces:**
 - Consumes: nada de novo.
 - Produces: a partir de agora, toda conexão SignalR feita com `/chatHub?user=X` tem
-  `Context.UserIdentifier == "X"` disponível no Hub — contrato que a Task 3 depende
+  `Context.UserIdentifier == "X"` disponível no Hub, contrato que a Task 3 depende
   diretamente.
 
 - [ ] **Step 1: Implementar o provider**
@@ -127,7 +127,7 @@ public class QueryStringUserIdProvider : IUserIdProvider
 }
 ```
 
-Nota: esta classe não ganha teste de unidade dedicado — `HubConnectionContext` não é
+Nota: esta classe não ganha teste de unidade dedicado, `HubConnectionContext` não é
 trivial de instanciar isoladamente em teste (depende de infraestrutura interna do
 SignalR), e a lógica em si é uma única linha. A verificação real acontece na Task 3
 (o Hub usando `Context.UserIdentifier` em testes com um contexto falso) e na Task 10
@@ -135,7 +135,7 @@ SignalR), e a lógica em si é uma única linha. A verificação real acontece n
 
 - [ ] **Step 2: Registrar o provider**
 
-`backend/ChatServer/Program.cs` — adicionar o `using` e a linha de registro (em
+`backend/ChatServer/Program.cs`, adicionar o `using` e a linha de registro (em
 qualquer ponto antes de `builder.Build()`, ao lado do restante da configuração de
 SignalR):
 
@@ -165,7 +165,7 @@ git commit -m "feat: identificar conexao via query string (IUserIdProvider)"
 
 ---
 
-## Task 3: Reescrever o ChatHub — Sala Geral automática + mensagem privada
+## Task 3: Reescrever o ChatHub, Sala Geral automática + mensagem privada
 
 **Files:**
 - Modify: `backend/ChatServer/Hubs/ChatHub.cs`
@@ -175,13 +175,13 @@ git commit -m "feat: identificar conexao via query string (IUserIdProvider)"
 - Consumes: `Context.UserIdentifier` (Task 2), `IRoomPresenceService.AddUserAsync`/
   `RemoveUserAsync` (sem mudança de assinatura, já existentes).
 - Produces: contrato do Hub que o frontend (Tasks 6-8) consome:
-  - `OnConnectedAsync()` — entra sozinho na Sala Geral, manda `RoomJoined(string[])`
+  - `OnConnectedAsync()`: entra sozinho na Sala Geral, manda `RoomJoined(string[])`
     pro chamador e `UserJoined(string userName, string replica)` pros outros.
-  - `SendMessage(string message)` — manda `ReceiveMessage(string userName, string message, string replica)` pro grupo Geral. **Não recebe mais `roomName`.**
-  - `SendPrivateMessage(string toUserName, string message)` — manda
+  - `SendMessage(string message)`: manda `ReceiveMessage(string userName, string message, string replica)` pro grupo Geral. **Não recebe mais `roomName`.**
+  - `SendPrivateMessage(string toUserName, string message)`, manda
     `ReceivePrivateMessage(string fromUserName, string message, string replica)` só
     pro destinatário.
-  - `OnDisconnectedAsync` — sai da Geral, manda `UserLeft(string userName, string replica)`.
+  - `OnDisconnectedAsync`: sai da Geral, manda `UserLeft(string userName, string replica)`.
   - **`JoinRoom` deixa de existir.**
 
 - [ ] **Step 1: Escrever os testes que falham**
@@ -336,7 +336,7 @@ public class ChatHubTests
 - [ ] **Step 2: Rodar e confirmar que falha**
 
 Run: `cd backend && dotnet test`
-Expected: FALHA de compilação — `ChatHub` ainda não tem `OnConnectedAsync` público
+Expected: FALHA de compilação, `ChatHub` ainda não tem `OnConnectedAsync` público
 sobrescrito nesse formato, nem `SendPrivateMessage`, e `SendMessage` ainda pede
 `roomName`.
 
@@ -424,7 +424,7 @@ public class ChatHub : Hub
 - [ ] **Step 4: Rodar e confirmar que passa**
 
 Run: `cd backend && dotnet test`
-Expected: PASS — os 4 testes em `ChatHubTests` verdes, output limpo.
+Expected: PASS; os 4 testes em `ChatHubTests` verdes, output limpo.
 
 - [ ] **Step 5: Commit**
 
@@ -442,7 +442,7 @@ git commit -m "feat: sala geral automatica e mensagem privada por usuario"
 
 **Interfaces:**
 - Consumes: nada de novo (mesma interface `IRoomPresenceService`).
-- Produces: nenhuma mudança de contrato — só um efeito colateral (a chave de presença
+- Produces: nenhuma mudança de contrato, só um efeito colateral (a chave de presença
   no Redis expira sozinha depois de um tempo sem atividade).
 
 - [ ] **Step 1: Adicionar expiração após cada escrita**
@@ -458,7 +458,7 @@ namespace ChatServer.Services;
 public class RedisRoomPresenceService : IRoomPresenceService
 {
     // Não é uma solução perfeita: se a sala ficar totalmente parada (ninguém entra
-    // ou sai) por mais de 4h, a chave expira mesmo com gente ainda conectada — nesse
+    // ou sai) por mais de 4h, a chave expira mesmo com gente ainda conectada, nesse
     // caso a próxima entrada/saída recria a chave normalmente. O objetivo aqui é só
     // evitar usuários "fantasma" presos pra sempre depois de uma queda abrupta do
     // servidor (ex: falta de energia), não substituir uma heartbeat de verdade.
@@ -510,7 +510,7 @@ Run: `docker compose up --build -d`, entre no chat pelo navegador uma vez, depoi
 ```bash
 docker compose exec redis redis-cli TTL room:Geral:users
 ```
-Expected: um número positivo (segundos restantes, próximo de 14400 = 4h) — prova
+Expected: um número positivo (segundos restantes, próximo de 14400 = 4h), prova
 de que a expiração foi de fato aplicada, não só "compilou".
 
 - [ ] **Step 4: Commit**
@@ -540,7 +540,7 @@ rm backend/ChatServer/wwwroot/test.html
 
 - [ ] **Step 2: Remover o middleware de arquivos estáticos (não serve mais nada)**
 
-`backend/ChatServer/Program.cs` — remover estas duas linhas (o Nginx já serve o
+`backend/ChatServer/Program.cs`, remover estas duas linhas (o Nginx já serve o
 Angular desde o ciclo anterior; nada mais no backend precisa de arquivos estáticos):
 
 ```csharp
@@ -562,7 +562,7 @@ git commit -m "chore: remover pagina de teste manual e static files mortos"
 
 ---
 
-## Task 6: ChatService — conexão identificada, Sala Geral e mensagens privadas
+## Task 6: ChatService, conexão identificada, Sala Geral e mensagens privadas
 
 **Files:**
 - Modify: `frontend/src/app/services/chat.service.ts`
@@ -622,7 +622,7 @@ export class ChatService {
     this.connection = new signalR.HubConnectionBuilder()
       // skipNegotiation + WebSockets-only: sem isso, o cliente faz um POST
       // /negotiate separado antes do upgrade de WebSocket, e sem sticky sessions
-      // o Nginx pode mandar cada requisição pra uma réplica diferente — a segunda
+      // o Nginx pode mandar cada requisição pra uma réplica diferente, a segunda
       // rejeita a conexão porque o connectionId só existe na réplica que negociou.
       // Pulando a negociação, a conexão vira uma única requisição atômica.
       .withUrl(`/chatHub?user=${encodeURIComponent(userName)}`, {
@@ -668,7 +668,7 @@ export class ChatService {
     await this.connection?.invoke('SendPrivateMessage', toUserName, message);
 
     // O servidor não ecoa a mensagem de volta pra quem manda (só entrega pro
-    // destinatário) — um eco não teria como carregar "pra quem eu mandei" de forma
+    // destinatário): um eco não teria como carregar "pra quem eu mandei" de forma
     // inequívoca. Como já sabemos localmente o que mandamos e pra quem, adicionamos
     // na nossa própria conversa assim que o envio é confirmado.
     this.privateMessages.update(map => {
@@ -684,12 +684,12 @@ export class ChatService {
 - [ ] **Step 2: Verificar que compila**
 
 Run: `cd frontend && npx ng build`
-Expected: **o build vai falhar** — mas só com erros originados em
+Expected: **o build vai falhar**, mas só com erros originados em
 `join-room.component.ts` e `chat-room.component.ts` (que ainda chamam a API
 antiga: `connect()` sem argumento, `joinRoom`, `sendMessage` com 3 argumentos,
-`messages`). Isso é esperado — essas duas telas só são atualizadas nas Tasks 7 e
+`messages`). Isso é esperado, essas duas telas só são atualizadas nas Tasks 7 e
 8. Confirme que **nenhum erro aponta pra dentro de `chat.service.ts`** (o arquivo
-que você escreveu) — se todos os erros forem só nos dois componentes antigos, o
+que você escreveu): se todos os erros forem só nos dois componentes antigos, o
 `ChatService` está correto. O build só volta a ficar limpo depois da Task 8.
 
 - [ ] **Step 3: Commit**
@@ -708,7 +708,7 @@ git commit -m "feat: ChatService com identidade na conexao e mensagem privada"
 
 **Interfaces:**
 - Consumes: `ChatService.connect(userName)` (Task 6).
-- Produces: navega pra `/chat?user=<userName>` ao entrar — contrato de rota
+- Produces: navega pra `/chat?user=<userName>` ao entrar, contrato de rota
   consumido pela Task 8.
 
 - [ ] **Step 1: Reescrever o componente**
@@ -759,17 +759,17 @@ export class JoinRoomComponent {
 }
 ```
 
-Nota: o CSS de `.join-container`/`.error-text` fica pra Task 9 (redesign visual) —
+Nota: o CSS de `.join-container`/`.error-text` fica pra Task 9 (redesign visual);
 por enquanto o elemento existe e funciona, só sem estilo bonito ainda.
 
 - [ ] **Step 2: Verificar que compila (com a ressalva já conhecida)**
 
 Run: `cd frontend && npx ng build`
-Expected: ainda vai falhar — mas agora **só** com erros em
+Expected: ainda vai falhar, mas agora **só** com erros em
 `chat-room.component.ts` (que só é atualizado na Task 8). Confirme que nenhum
 erro aponta pra `join-room.component.ts` (o arquivo que você acabou de reescrever)
 nem pra `chat.service.ts`. Um teste manual completo com `ng serve` só é possível
-depois da Task 8 (é isso que a Task 8 valida) — não tente rodar `ng serve` agora,
+depois da Task 8 (é isso que a Task 8 valida), não tente rodar `ng serve` agora,
 a tela de chat ainda está com a API antiga.
 
 - [ ] **Step 3: Commit**
@@ -781,7 +781,7 @@ git commit -m "feat: simplificar tela de entrada (so nome, sem sala)"
 
 ---
 
-## Task 8: Tela principal — Sala Geral, lista online clicável e chat privado
+## Task 8: Tela principal, Sala Geral, lista online clicável e chat privado
 
 **Files:**
 - Modify: `frontend/src/app/pages/chat-room/chat-room.component.ts`
@@ -916,7 +916,7 @@ export class ChatRoomComponent implements OnInit {
     } catch {
       this.errorMessage = 'Não foi possível enviar a mensagem.';
       // só restaura o rascunho se a pessoa não tiver digitado algo novo enquanto
-      // o envio falhava — evita atropelar um rascunho mais recente (ver ciclo
+      // o envio falhava: evita atropelar um rascunho mais recente (ver ciclo
       // anterior, revisão final, achado "sobrescrita de draft em corrida rara").
       if (this.draft === '') {
         this.draft = messageToSend;
@@ -927,13 +927,13 @@ export class ChatRoomComponent implements OnInit {
 ```
 
 Notas importantes pra quem for implementar:
-- Usa o control flow nativo do Angular (`@if`/`@for`) — **não** importa
+- Usa o control flow nativo do Angular (`@if`/`@for`), **não** importa
   `CommonModule`/`NgFor` (não precisa mais, ao contrário do ciclo anterior).
 - `errorMessage` é limpo tanto ao trocar de conversa quanto ao início de cada envio
-  — resolve o achado da revisão final anterior sobre o aviso de erro que não sumia
+  e resolve o achado da revisão final anterior sobre o aviso de erro que não sumia
   sozinho.
 - O CSS de `.sidebar`, `.conversation-item.active`, `.message.mine`, etc. fica pra
-  Task 9 — a estrutura e o comportamento já ficam corretos aqui, só sem o visual
+  Task 9: a estrutura e o comportamento já ficam corretos aqui, só sem o visual
   final.
 
 - [ ] **Step 3: Validar manualmente end-to-end (com o stack completo rodando)**
@@ -959,7 +959,7 @@ git commit -m "feat: sala geral com lista online clicavel e chat privado"
 
 ---
 
-## Task 9: Redesign visual — tema escuro por padrão + alternância pra claro
+## Task 9: Redesign visual, tema escuro por padrão + alternância pra claro
 
 **Files:**
 - Create: `frontend/src/app/services/theme.service.ts`
@@ -1009,7 +1009,7 @@ export class ThemeService {
 
 - [ ] **Step 2: Definir a paleta em CSS custom properties**
 
-`frontend/src/styles.scss` (substitui o conteúdo — hoje está vazio):
+`frontend/src/styles.scss` (substitui o conteúdo, hoje está vazio):
 
 ```scss
 :root {
@@ -1052,7 +1052,7 @@ qual é o mecanismo atual de dark mode do preset Aura (normalmente uma opção
 seletor CSS). Configure esse seletor para bater com `[data-theme="dark"]` (o mesmo
 atributo que o `ThemeService` já está aplicando na tag `<html>`), de forma que os
 componentes do PrimeNG (botões, inputs) troquem de aparência junto com o resto da
-paleta. Valide visualmente no navegador — se a versão instalada tiver uma API
+paleta. Valide visualmente no navegador, se a versão instalada tiver uma API
 diferente da esperada, adapte mantendo a intenção (tema PrimeNG sincronizado com
 `ThemeService.mode`).
 
@@ -1073,7 +1073,7 @@ definidas no Step 2 (`var(--bg)`, `var(--surface)`, `var(--border)`, `var(--text
 - Input e botão de enviar usando os componentes do PrimeNG já em uso (`pInputText`,
   `p-button`), com a paleta do Step 3 refletindo automaticamente.
 
-Não precisa (nem deve) ficar pixel-perfect — o objetivo é sair do visual "cru" de
+Não precisa (nem deve) ficar pixel-perfect, o objetivo é sair do visual "cru" de
 antes pra algo visivelmente moderno e coerente, seguindo a paleta aprovada.
 
 - [ ] **Step 5: Validar visualmente**
@@ -1106,16 +1106,16 @@ git commit -m "feat: redesign visual com tema escuro padrao e alternancia"
 
 Run: `docker compose up --build`
 
-1. Abra `http://localhost/` em duas abas/perfis, entre com nomes diferentes — as
+1. Abra `http://localhost/` em duas abas/perfis, entre com nomes diferentes, as
    duas caem direto na Sala Geral, sem pedir nome de sala.
 2. Mande mensagem na Geral dos dois lados, confirme entrega em tempo real (inclusive
    cruzando réplicas, do jeito que já validamos no ciclo anterior).
 3. Clique no nome da outra pessoa em cada aba, confirme que abre uma conversa
    privada e que mensagens ali não vazam pra Sala Geral nem pra mais ninguém.
-4. Recarregue uma das abas no meio da conversa (F5) — confirme que reconecta e
+4. Recarregue uma das abas no meio da conversa (F5), confirme que reconecta e
    volta a aparecer na lista de online sozinho (sem precisar reentrar manualmente).
 5. Alterne o tema claro/escuro, recarregue, confirme que a escolha persistiu.
-6. `docker compose exec redis redis-cli TTL room:Geral:users` — confirme que retorna
+6. `docker compose exec redis redis-cli TTL room:Geral:users`, confirme que retorna
    um TTL positivo.
 
 - [ ] **Step 2: Atualizar o README**
@@ -1124,7 +1124,7 @@ Revise `README.md` pra refletir:
 - Stack atualizado: `.NET 10` no lugar de `.NET 9`.
 - Nova seção descrevendo Sala Geral + chat privado (substituindo qualquer menção ao
   antigo fluxo de "digitar nome de sala").
-- Remover ou revisar a limitação antiga "reconexão não reentra na sala" — com a Sala
+- Remover ou revisar a limitação antiga "reconexão não reentra na sala", com a Sala
   Geral entrando automaticamente em `OnConnectedAsync`, isso deixou de ser um
   problema (toda reconexão já reentra sozinha). Se ainda achar relevante mencionar
   alguma nuance de reconexão, deixe claro que é sobre estado local de UI, não sobre

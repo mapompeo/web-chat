@@ -6,17 +6,17 @@
 
 **Architecture:** O backend reaproveita 100% do `IRoomPresenceService` já existente (tratando cada réplica como mais uma "sala"), acrescenta um método de leitura pura (`GetUsersAsync`) e um novo grupo SignalR (`"Visualizador"`) na mesma conexão do chat, que recebe eventos leves de connect/disconnect/mensagem. O frontend guarda esse estado em novos sinais no `ChatService` já existente e desenha o diagrama num componente Angular novo, usando SVG inline (sem lib de diagramação) e reaproveitando o `AvatarService` já existente.
 
-**Tech Stack:** ASP.NET Core / SignalR (backend, já existente), Angular 22 + Signals (frontend, já existente), Redis (já existente) — nenhuma dependência nova.
+**Tech Stack:** ASP.NET Core / SignalR (backend, já existente), Angular 22 + Signals (frontend, já existente), Redis (já existente), nenhuma dependência nova.
 
 **Spec:** `docs/superpowers/specs/2026-09-05-visualizador-arquitetura-design.md`
 
 ## Global Constraints
 
 - A topologia é sempre fixa: exatamente 3 réplicas, nomeadas `"Servidor A"`, `"Servidor B"`, `"Servidor C"` (mesmos valores das variáveis `REPLICA_NAME` no `docker-compose.yml`).
-- O evento `VisualizerPrivateMessage` **nunca** carrega nome de usuário nem conteúdo de mensagem — só nomes de réplica. Isso é verificado explicitamente em teste (contagem exata de campos no payload), não só por convenção de exibição.
-- Nenhuma dependência nova de biblioteca de ícones ou de diagramação — ícones em SVG inline, no próprio código.
-- Avatares reaproveitam o `AvatarService` já existente (DiceBear, gerado localmente, determinístico por nome) — mesma pessoa, mesmo desenho, em qualquer lugar do app.
-- Nenhuma lógica Redis nova é escrita — toda a presença por réplica reaproveita o `IRoomPresenceService` já existente e testado sob estresse.
+- O evento `VisualizerPrivateMessage` **nunca** carrega nome de usuário nem conteúdo de mensagem: só nomes de réplica. Isso é verificado explicitamente em teste (contagem exata de campos no payload), não só por convenção de exibição.
+- Nenhuma dependência nova de biblioteca de ícones ou de diagramação, ícones em SVG inline, no próprio código.
+- Avatares reaproveitam o `AvatarService` já existente (DiceBear, gerado localmente, determinístico por nome): mesma pessoa, mesmo desenho, em qualquer lugar do app.
+- Nenhuma lógica Redis nova é escrita: toda a presença por réplica reaproveita o `IRoomPresenceService` já existente e testado sob estresse.
 - O painel começa aberto por padrão, com um botão pra esconder/mostrar.
 
 ---
@@ -29,7 +29,7 @@
 
 **Interfaces:**
 - Consumes: `IRoomPresenceService.AddUserAsync(string roomName, string userName): Task<IReadOnlyList<string>>` e `RemoveUserAsync(string roomName, string userName): Task<IReadOnlyList<string>>` (já existem hoje, sem mudança de assinatura).
-- Produces: nenhuma interface nova — só um efeito colateral a mais no `ChatHub` (a presença passa a ser rastreada também com o nome da réplica como "sala").
+- Produces: nenhuma interface nova; só um efeito colateral a mais no `ChatHub` (a presença passa a ser rastreada também com o nome da réplica como "sala").
 
 - [ ] **Step 1: Escrever os testes que falham**
 
@@ -87,7 +87,7 @@ Adicione estes dois testes ao final da classe `ChatHubTests`, antes do método `
 - [ ] **Step 2: Rodar os testes e confirmar que falham**
 
 Run: `cd backend && dotnet test --filter "OnConnectedAsync_AlsoTracksPresenceByReplicaName|OnDisconnectedAsync_AlsoRemovesPresenceByReplicaName"`
-Expected: FAIL — `presence.Verify(...)` acusa 0 chamadas em vez de 1, porque o `ChatHub` ainda não chama `AddUserAsync`/`RemoveUserAsync` com o nome da réplica.
+Expected: FAIL; `presence.Verify(...)` acusa 0 chamadas em vez de 1, porque o `ChatHub` ainda não chama `AddUserAsync`/`RemoveUserAsync` com o nome da réplica.
 
 - [ ] **Step 3: Implementar**
 
@@ -106,7 +106,7 @@ No `OnDisconnectedAsync`, logo depois da linha `await _presence.RemoveUserAsync(
 - [ ] **Step 4: Rodar todos os testes e confirmar que passam**
 
 Run: `cd backend && dotnet test`
-Expected: PASS — todos os 7 testes (5 já existentes + 2 novos).
+Expected: PASS, todos os 7 testes (5 já existentes + 2 novos).
 
 - [ ] **Step 5: Commit**
 
@@ -127,16 +127,16 @@ git commit -m "feat: rastreia presenca tambem por nome de replica"
 
 **Interfaces:**
 - Consumes: a presença por réplica da Task 1.
-- Produces: `IRoomPresenceService.GetUsersAsync(string roomName): Task<IReadOnlyList<string>>` (novo, público); eventos SignalR `VisualizerSnapshot(Dictionary<string,string[]>)`, `VisualizerUserConnected(string replica, string userName)`, `VisualizerUserDisconnected(string replica, string userName)`, `VisualizerGeralMessage(string fromReplica, string userName, string[] activeReplicas)`, `VisualizerPrivateMessage(string fromReplica, string[] toReplicas)` — consumidos pelo frontend na Task 3.
+- Produces: `IRoomPresenceService.GetUsersAsync(string roomName): Task<IReadOnlyList<string>>` (novo, público); eventos SignalR `VisualizerSnapshot(Dictionary<string,string[]>)`, `VisualizerUserConnected(string replica, string userName)`, `VisualizerUserDisconnected(string replica, string userName)`, `VisualizerGeralMessage(string fromReplica, string userName, string[] activeReplicas)`, `VisualizerPrivateMessage(string fromReplica, string[] toReplicas)`, consumidos pelo frontend na Task 3.
 
 - [ ] **Step 1: Escrever os testes que falham**
 
 Primeiro, adicione o método novo à interface **e** torne público o método
-equivalente em `RedisRoomPresenceService` — as duas mudanças precisam ir
+equivalente em `RedisRoomPresenceService`, as duas mudanças precisam ir
 juntas neste mesmo passo, senão a solução para de compilar entre um passo e
 outro (a classe deixaria de implementar a interface assim que o método novo
 fosse adicionado só nela). Nenhuma das duas é "a implementação sob teste"
-aqui — só o comportamento novo do `ChatHub` (Step 3) é.
+aqui, só o comportamento novo do `ChatHub` (Step 3) é.
 
 Conteúdo final de `IRoomPresenceService.cs`:
 
@@ -158,7 +158,7 @@ Em `RedisRoomPresenceService.cs`, troque a assinatura do método privado
     public async Task<IReadOnlyList<string>> GetUsersAsync(string roomName)
 ```
 
-Agora substitua **o arquivo inteiro** `backend/ChatServer.Tests/ChatHubTests.cs` por este conteúdo (ele já inclui os 7 testes anteriores — 3 deles precisaram ganhar mocks novos porque o código que vamos escrever no Step 3 passa a chamar `Clients.Group("Visualizador")`/`Clients.OthersInGroup("Visualizador")`/`presence.GetUsersAsync(...)` em todo `OnConnectedAsync`, `SendMessage`, `SendPrivateMessage` e `OnDisconnectedAsync` — sem esses mocks, os testes antigos quebrariam com `NullReferenceException` em vez de passar):
+Agora substitua **o arquivo inteiro** `backend/ChatServer.Tests/ChatHubTests.cs` por este conteúdo (ele já inclui os 7 testes anteriores: 3 deles precisaram ganhar mocks novos porque o código que vamos escrever no Step 3 passa a chamar `Clients.Group("Visualizador")`/`Clients.OthersInGroup("Visualizador")`/`presence.GetUsersAsync(...)` em todo `OnConnectedAsync`, `SendMessage`, `SendPrivateMessage` e `OnDisconnectedAsync`; sem esses mocks, os testes antigos quebrariam com `NullReferenceException` em vez de passar):
 
 ```csharp
 using ChatServer.Hubs;
@@ -428,7 +428,7 @@ public class ChatHubTests
         await hub.SendPrivateMessage("Bob", "oi Bob, so pra voce");
 
         // Garante, com contagem exata de campos, que o payload NUNCA carrega nome
-        // nem conteúdo de mensagem privada de terceiros — só nomes de réplica.
+        // nem conteúdo de mensagem privada de terceiros, só nomes de réplica.
         visualizerProxy.Verify(
             p => p.SendCoreAsync(
                 "VisualizerPrivateMessage",
@@ -548,14 +548,14 @@ public class ChatHubTests
 - [ ] **Step 2: Rodar os testes e confirmar que falham**
 
 Run: `cd backend && dotnet test`
-Expected: FAIL — os testes novos (`OnConnectedAsync_SendsVisualizerSnapshot_AndBroadcastsConnected`,
+Expected: FAIL; os testes novos (`OnConnectedAsync_SendsVisualizerSnapshot_AndBroadcastsConnected`,
 `SendMessage_BroadcastsVisualizerGeralMessage_WithActiveReplicas`,
 `SendPrivateMessage_BroadcastsVisualizerPrivateMessage_WithoutAnyNames`,
 `OnDisconnectedAsync_BroadcastsVisualizerUserDisconnected`) falham porque o `ChatHub` ainda não manda esses eventos. Os testes antigos continuam passando (só ganharam mocks extras que ainda não são exercitados).
 
 - [ ] **Step 3: Implementar**
 
-(`IRoomPresenceService.cs` e `RedisRoomPresenceService.cs` já foram ajustados no Step 1 — eram pré-requisito de compilação, não comportamento sob teste.)
+(`IRoomPresenceService.cs` e `RedisRoomPresenceService.cs` já foram ajustados no Step 1: eram pré-requisito de compilação, não comportamento sob teste.)
 
 Substitua **o arquivo inteiro** `backend/ChatServer/Hubs/ChatHub.cs` por este conteúdo:
 
@@ -571,7 +571,7 @@ public class ChatHub : Hub
     private const string VisualizerGroup = "Visualizador";
 
     // A topologia deste projeto é sempre fixa (é um estudo de escalonamento com 3
-    // réplicas, não um sistema com número variável de instâncias) — por isso os
+    // réplicas, não um sistema com número variável de instâncias), por isso os
     // nomes ficam hardcoded aqui, espelhando os valores de REPLICA_NAME no
     // docker-compose.yml. Se um dia mudarem, os dois lugares precisam acompanhar.
     private static readonly string[] AllReplicaNames = ["Servidor A", "Servidor B", "Servidor C"];
@@ -593,7 +593,7 @@ public class ChatHub : Hub
         if (string.IsNullOrWhiteSpace(userName))
         {
             // Sem identidade não há como manter a presença nem endereçar mensagens
-            // privadas a essa conexão — em vez de aceitar a conexão "muda" e deixar
+            // privadas a essa conexão, em vez de aceitar a conexão "muda" e deixar
             // ela transmitir como "desconhecido" (invisível na lista online), rejeita
             // de cara.
             Context.Abort();
@@ -631,7 +631,7 @@ public class ChatHub : Hub
             "[{Replica}] mensagem de {User} na Sala Geral: {Message}",
             _replicaName, userName, message);
 
-        // O timestamp é gerado aqui, em UTC, e não já formatado — o navegador de quem
+        // O timestamp é gerado aqui, em UTC, e não já formatado, o navegador de quem
         // recebe é quem aplica o fuso horário local. O container pode estar rodando em
         // um fuso diferente do de quem está usando o chat, então formatar no servidor
         // mostraria a hora errada.
@@ -654,7 +654,7 @@ public class ChatHub : Hub
         await Clients.User(toUserName).SendAsync("ReceivePrivateMessage", fromUserName, message, _replicaName, timestamp);
 
         // O visualizador nunca recebe nome nem conteúdo de mensagem privada de
-        // terceiros — só os nomes das réplicas envolvidas, pra provar que o caminho
+        // terceiros: só os nomes das réplicas envolvidas, pra provar que o caminho
         // técnico existe sem expor quem conversa com quem.
         var toReplicas = await GetReplicasForUserAsync(toUserName);
         await Clients.Group(VisualizerGroup).SendAsync("VisualizerPrivateMessage", _replicaName, toReplicas);
@@ -710,7 +710,7 @@ public class ChatHub : Hub
 - [ ] **Step 4: Rodar todos os testes e confirmar que passam**
 
 Run: `cd backend && dotnet test`
-Expected: PASS — todos os 11 testes.
+Expected: PASS, todos os 11 testes.
 
 - [ ] **Step 5: Commit**
 
@@ -730,7 +730,7 @@ git commit -m "feat: eventos do visualizador de arquitetura no ChatHub"
 - Consumes: eventos SignalR `VisualizerSnapshot`, `VisualizerUserConnected`, `VisualizerUserDisconnected`, `VisualizerGeralMessage`, `VisualizerPrivateMessage` (produzidos na Task 2).
 - Produces: `ChatService.replicaUsers: Signal<Map<string, string[]>>`, `ChatService.visualizerPulses: Signal<VisualizerPulse[]>`, interface `VisualizerPulse` (exportada, consumida pela Task 4).
 
-Este projeto não tem framework de teste unitário configurado pro Angular (verificado: nenhum `*.spec.ts` existe hoje) — a verificação estabelecida no projeto inteiro até aqui é `ng build` (checagem de tipos) seguido de teste ao vivo com o navegador. Este padrão continua aqui.
+Este projeto não tem framework de teste unitário configurado pro Angular (verificado: nenhum `*.spec.ts` existe hoje); a verificação estabelecida no projeto inteiro até aqui é `ng build` (checagem de tipos) seguido de teste ao vivo com o navegador. Este padrão continua aqui.
 
 - [ ] **Step 1: Implementar**
 
@@ -753,12 +753,12 @@ export interface VisualizerPulse {
   replica?: string;           // connect/disconnect
   fromReplica?: string;       // geral/privada
   toReplicas?: string[];      // geral (leque) ou privada (pode ter mais de uma réplica)
-  userName?: string;          // connect/disconnect/geral — nunca em privada
+  userName?: string;          // connect/disconnect/geral, nunca em privada
 }
 
 @Injectable({ providedIn: 'root' })
 export class ChatService {
-  // Duração da animação de cada pulso no painel do visualizador — precisa bater
+  // Duração da animação de cada pulso no painel do visualizador, precisa bater
   // com a duração declarada em @keyframes viz-flow-down/viz-flow-up no styles.scss
   // (Task 4), senão o pulso some da tela antes (ou depois) da animação acabar.
   private static readonly PULSE_DURATION_MS = 1400;
@@ -793,7 +793,7 @@ export class ChatService {
     this.connection = new signalR.HubConnectionBuilder()
       // skipNegotiation + WebSockets-only: sem isso, o cliente faz um POST
       // /negotiate separado antes do upgrade de WebSocket, e sem sticky sessions
-      // o Nginx pode mandar cada requisição pra uma réplica diferente — a segunda
+      // o Nginx pode mandar cada requisição pra uma réplica diferente, a segunda
       // rejeita a conexão porque o connectionId só existe na réplica que negociou.
       // Pulando a negociação, a conexão vira uma única requisição atômica.
       .withUrl(`/chatHub?user=${encodeURIComponent(userName)}`, {
@@ -826,7 +826,7 @@ export class ChatService {
         next.set(fromUser, [...existing, { userName: fromUser, message, replica, timestamp }]);
         return next;
       });
-      // Marca como não lida sempre — quem estiver com a conversa aberta na hora
+      // Marca como não lida sempre, quem estiver com a conversa aberta na hora
       // limpa isso de volta imediatamente (ver efeito em ChatRoomComponent), então
       // na prática só fica marcado quem realmente não está olhando aquela conversa.
       this.unreadPrivate.update(set => new Set(set).add(fromUser));
@@ -886,7 +886,7 @@ export class ChatService {
     await this.connection?.invoke('SendPrivateMessage', toUserName, message);
 
     // O servidor não ecoa a mensagem de volta pra quem manda (só entrega pro
-    // destinatário) — um eco não teria como carregar "pra quem eu mandei" de forma
+    // destinatário): um eco não teria como carregar "pra quem eu mandei" de forma
     // inequívoca. Como já sabemos localmente o que mandamos e pra quem, adicionamos
     // na nossa própria conversa assim que o envio é confirmado.
     this.privateMessages.update(map => {
@@ -914,7 +914,7 @@ export class ChatService {
 - [ ] **Step 2: Verificar que compila**
 
 Run: `cd frontend && npx ng build`
-Expected: build limpo, sem erros de tipo (o `VisualizerPanelComponent` que vai consumir `VisualizerPulse` só chega na Task 4 — nesta task ainda não há nenhum consumidor, o que é esperado).
+Expected: build limpo, sem erros de tipo (o `VisualizerPanelComponent` que vai consumir `VisualizerPulse` só chega na Task 4; nesta task ainda não há nenhum consumidor, o que é esperado).
 
 - [ ] **Step 3: Commit**
 
@@ -1023,7 +1023,7 @@ import { AvatarService } from '../../services/avatar.service';
   `
 })
 export class VisualizerPanelComponent {
-  // Mesma lista fixa que o backend usa em ChatHub.AllReplicaNames — ver
+  // Mesma lista fixa que o backend usa em ChatHub.AllReplicaNames, ver
   // docs/superpowers/specs/2026-09-05-visualizador-arquitetura-design.md
   // pela explicação de por que isso é hardcoded nos dois lados.
   readonly replicaNames = ['Servidor A', 'Servidor B', 'Servidor C'];
@@ -1049,7 +1049,7 @@ export class VisualizerPanelComponent {
       }
       // Uma mensagem geral inclui a própria réplica de quem mandou na lista de
       // destinos (porque o grupo do SignalR entrega de volta pra quem mandou
-      // também) — ignoramos esse caso aqui pra não desenhar um pulso "subindo"
+      // também): ignoramos esse caso aqui pra não desenhar um pulso "subindo"
       // de volta pro mesmo servidor que acabou de mandar, o que ficaria estranho
       // visualmente mesmo sendo tecnicamente real.
       if (p.toReplicas?.includes(replica) && p.fromReplica !== replica) {
@@ -1234,7 +1234,7 @@ Adicione ao final de `frontend/src/styles.scss`:
 - [ ] **Step 3: Verificar que compila**
 
 Run: `cd frontend && npx ng build`
-Expected: build limpo. O componente ainda não está referenciado em nenhum lugar do app (isso acontece na Task 5) — `ng build` não reclama de componentes standalone não utilizados, então isso é esperado.
+Expected: build limpo. O componente ainda não está referenciado em nenhum lugar do app (isso acontece na Task 5); `ng build` não reclama de componentes standalone não utilizados, então isso é esperado.
 
 - [ ] **Step 4: Commit**
 
@@ -1373,7 +1373,7 @@ export class ChatRoomComponent implements OnInit {
     public avatar: AvatarService
   ) {
     // Rola a lista de mensagens pro final sempre que uma nova mensagem chegar
-    // (na sala atual ou numa conversa privada) — sem isso, mensagens novas
+    // (na sala atual ou numa conversa privada), sem isso, mensagens novas
     // ficam escondidas abaixo da área visível assim que a lista cresce demais.
     // O setTimeout(0) empurra a rolagem pro próximo tick, depois que o Angular
     // já atualizou o DOM com o novo <li>.
@@ -1388,7 +1388,7 @@ export class ChatRoomComponent implements OnInit {
     });
 
     // Se a conversa que acabou de receber mensagem nova já é a que está aberta na
-    // tela, limpa o "não lida" de volta imediatamente — assim a bolinha só aparece
+    // tela, limpa o "não lida" de volta imediatamente, assim a bolinha só aparece
     // pra conversas que a pessoa não está olhando no momento.
     effect(() => {
       const unread = this.chatService.unreadPrivate();
@@ -1433,7 +1433,7 @@ export class ChatRoomComponent implements OnInit {
   }
 
   formatTime(timestamp: string): string {
-    // O servidor manda o horário em UTC — formatamos aqui pra usar o fuso horário
+    // O servidor manda o horário em UTC, formatamos aqui pra usar o fuso horário
     // local de quem está vendo, já que o container pode rodar em outro fuso.
     return new Date(timestamp).toLocaleTimeString('pt-BR', {
       hour: '2-digit',
@@ -1457,7 +1457,7 @@ export class ChatRoomComponent implements OnInit {
     } catch {
       this.errorMessage = 'Não foi possível enviar a mensagem.';
       // só restaura o rascunho se a pessoa não tiver digitado algo novo enquanto
-      // o envio falhava — evita atropelar um rascunho mais recente (ver ciclo
+      // o envio falhava: evita atropelar um rascunho mais recente (ver ciclo
       // anterior, revisão final, achado "sobrescrita de draft em corrida rara").
       if (this.draft === '') {
         this.draft = messageToSend;
@@ -1501,4 +1501,4 @@ Suba o stack com `docker compose up --build -d` e abra pelo menos 2 abas com nom
 - Mandar uma mensagem privada de uma aba pra outra dispara um pulso **sem nome nenhum** entre os dois servidores certos.
 - O botão de esconder/mostrar o painel funciona nos dois sentidos.
 
-Se algo não bater, ajuste antes de considerar a task concluída — esta é a única verificação de ponta a ponta deste recurso, já que não há teste automatizado de frontend no projeto.
+Se algo não bater, ajuste antes de considerar a task concluída: esta é a única verificação de ponta a ponta deste recurso, já que não há teste automatizado de frontend no projeto.

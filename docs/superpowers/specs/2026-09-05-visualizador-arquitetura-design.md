@@ -1,10 +1,10 @@
-# Visualizador de Arquitetura — Design
+# Visualizador de Arquitetura: Design
 
 ## Objetivo
 
 Hoje o web-chat *faz* escalonamento horizontal de verdade (3 réplicas do
 backend atrás de um load balancer sem sticky sessions, com Redis como
-backplane), mas isso é invisível pra quem usa o app — parece só "mais um
+backplane), mas isso é invisível pra quem usa o app, parece só "mais um
 chat". Este recurso expõe essa arquitetura visualmente, num painel lateral
 sempre visível ao lado da conversa, mostrando os 3 servidores, o Nginx, o
 Redis, quem está conectado em cada servidor, e o fluxo real das mensagens
@@ -18,9 +18,9 @@ avaliar o portfolio.
 - Visão agregada de **todo mundo conectado** (não só as próprias mensagens
   de quem está olhando).
 - Mensagens da Sala Geral: mostram o nome de quem mandou (já é informação
-  pública — todo mundo vê na própria sala).
+  pública, todo mundo vê na própria sala).
 - Mensagens privadas de terceiros: aparecem só como um pulso anônimo entre
-  dois servidores, **sem nome de ninguém nem conteúdo** — o objetivo é
+  dois servidores, **sem nome de ninguém nem conteúdo**, o objetivo é
   provar que o caminho técnico existe, não expor conversas alheias.
 - Painel fixo, sempre visível na tela de chat (não é uma rota separada),
   com um botão pra esconder/mostrar, começando aberto por padrão.
@@ -28,13 +28,13 @@ avaliar o portfolio.
 ## Fora de escopo
 
 - Contagem/telemetria de infraestrutura além de conexões e mensagens (CPU,
-  memória, latência de rede) — não é objetivo deste recurso.
+  memória, latência de rede), não é objetivo deste recurso.
 - Qualquer forma de reconstruir o conteúdo de uma mensagem privada de
   terceiros a partir do painel.
-- Suporte a um número variável de réplicas — a topologia é sempre fixa
+- Suporte a um número variável de réplicas, a topologia é sempre fixa
   (exatamente 3 servidores), igual ao resto do projeto hoje.
 
-## Arquitetura — fluxo de dados
+## Arquitetura: fluxo de dados
 
 ```mermaid
 sequenceDiagram
@@ -54,7 +54,7 @@ sequenceDiagram
 ```
 
 Todo cliente conectado ao chat já entra automaticamente no grupo
-`"Visualizador"` do SignalR — é a mesma conexão WebSocket que já existe
+`"Visualizador"` do SignalR, é a mesma conexão WebSocket que já existe
 pro chat, nenhuma conexão nova é aberta. Os eventos do visualizador
 trafegam pelo mesmo backplane Redis que já faz o `Clients.Group(...)`
 funcionar entre réplicas diferentes hoje.
@@ -71,7 +71,7 @@ private static readonly string[] AllReplicaNames = ["Servidor A", "Servidor B", 
 ```
 
 Essa lista duplica manualmente os nomes que já estão nas variáveis de
-ambiente `REPLICA_NAME` do `docker-compose.yml` — mesma limitação que já
+ambiente `REPLICA_NAME` do `docker-compose.yml`, mesma limitação que já
 existe hoje com a constante `GeralRoom`. Se algum dia esses nomes mudarem
 ou uma 4ª réplica for adicionada, os dois lugares precisam ser
 atualizados juntos. Aceitável porque a topologia deste projeto é
@@ -89,7 +89,7 @@ mais uma sala:
 - `OnDisconnectedAsync`: chama `RemoveUserAsync(_replicaName, userName)`
   simetricamente.
 
-Nenhuma lógica Redis nova é escrita — reaproveita 100% do serviço
+Nenhuma lógica Redis nova é escrita, reaproveita 100% do serviço
 existente (contagem por conexão via HASH, scripts Lua atômicos, TTL de
 4h de segurança), já testado sob estresse.
 
@@ -100,14 +100,14 @@ pro `Clients.Caller`):
 
 | Evento | Quando | Payload |
 |---|---|---|
-| `VisualizerSnapshot` | ao conectar (`Clients.Caller`) | `Dictionary<string, string[]>` — nome do servidor → usuários conectados nele agora, uma entrada por réplica em `AllReplicaNames` |
+| `VisualizerSnapshot` | ao conectar (`Clients.Caller`) | `Dictionary<string, string[]>`: nome do servidor → usuários conectados nele agora, uma entrada por réplica em `AllReplicaNames` |
 | `VisualizerUserConnected` | em `OnConnectedAsync`, após validar identidade | `replica: string, userName: string` |
 | `VisualizerUserDisconnected` | em `OnDisconnectedAsync` | `replica: string, userName: string` |
-| `VisualizerGeralMessage` | em `SendMessage` | `fromReplica: string, userName: string, activeReplicas: string[]` — `activeReplicas` é a lista de réplicas (calculada na hora, consultando a presença de cada uma) que têm pelo menos um usuário conectado, usada pro pulso "em leque" |
-| `VisualizerPrivateMessage` | em `SendPrivateMessage` | `fromReplica: string, toReplicas: string[]` — **sem nenhum campo de nome ou conteúdo**. É uma lista (não um único valor) porque a pessoa destinatária pode ter abas abertas em mais de uma réplica ao mesmo tempo (cada aba pode ter caído numa réplica diferente do Nginx); `Clients.User(...)` entrega a mensagem em todas simultaneamente, então o pulso precisa refletir isso. |
+| `VisualizerGeralMessage` | em `SendMessage` | `fromReplica: string, userName: string, activeReplicas: string[]`; `activeReplicas` é a lista de réplicas (calculada na hora, consultando a presença de cada uma) que têm pelo menos um usuário conectado, usada pro pulso "em leque" |
+| `VisualizerPrivateMessage` | em `SendPrivateMessage` | `fromReplica: string, toReplicas: string[]`; **sem nenhum campo de nome ou conteúdo**. É uma lista (não um único valor) porque a pessoa destinatária pode ter abas abertas em mais de uma réplica ao mesmo tempo (cada aba pode ter caído numa réplica diferente do Nginx); `Clients.User(...)` entrega a mensagem em todas simultaneamente, então o pulso precisa refletir isso. |
 
 O snapshot precisa de uma leitura pura (sem adicionar/remover ninguém),
-que a interface `IRoomPresenceService` hoje não expõe — só existe como
+que a interface `IRoomPresenceService` hoje não expõe, só existe como
 método privado dentro de `RedisRoomPresenceService`. Este recurso adiciona
 um método novo à interface:
 
@@ -136,22 +136,22 @@ export interface VisualizerPulse {
   replica?: string;           // connect/disconnect
   fromReplica?: string;       // geral/privada
   toReplicas?: string[];      // geral (leque) ou privada (pode ter mais de uma réplica)
-  userName?: string;          // connect/disconnect/geral — nunca em privada
+  userName?: string;          // connect/disconnect/geral, nunca em privada
 }
 ```
 
 Cada pulso é removido do array pelo próprio `ChatService`, via
-`setTimeout`, ~2 segundos depois de criado — o componente não precisa
+`setTimeout`, ~2 segundos depois de criado, o componente não precisa
 gerenciar essa limpeza.
 
 ### Componente novo: `VisualizerPanelComponent`
 
 Standalone, em `frontend/src/app/components/visualizer-panel/`. Desenha
 o layout validado no protótipo visual: painel com altura total da tela,
-ícones inline em SVG (servidor, load balancer, banco de dados — sem nova
+ícones inline em SVG (servidor, load balancer, banco de dados, sem nova
 dependência), linhas tracejadas sempre visíveis entre os nós, com os
 pulsos animando por cima delas. Os avatares reaproveitam o
-`AvatarService` já existente — mesma pessoa, mesmo desenho, em qualquer
+`AvatarService` já existente, mesma pessoa, mesmo desenho, em qualquer
 lugar do app.
 
 ### Layout
@@ -163,7 +163,7 @@ aberto por padrão.
 ## Casos de borda
 
 - **Mesma pessoa com abas em réplicas diferentes**: o avatar dela aparece
-  embaixo de cada servidor onde tiver uma aba conectada — reflexo real de
+  embaixo de cada servidor onde tiver uma aba conectada, reflexo real de
   como o balanceamento funciona, não é tratado como bug.
 - **Reconexão automática**: já existe (`withAutomaticReconnect`); como o
   snapshot é reenviado toda vez que `OnConnectedAsync` roda, o painel se
@@ -171,7 +171,7 @@ aberto por padrão.
 - **Conexão derrubada sem `OnDisconnectedAsync` limpo**: herda o TTL de 4h
   do Redis já existente pra sala Geral, de graça, por reaproveitar o mesmo
   serviço.
-- **Anonimato do privado**: estrutural — o evento `VisualizerPrivateMessage`
+- **Anonimato do privado**: estrutural, o evento `VisualizerPrivateMessage`
   simplesmente não tem campo de nome, não é uma questão de "esconder na
   tela".
 
@@ -185,6 +185,6 @@ aberto por padrão.
   conectar.
 - **Frontend**: `ng build` limpo; verificação ao vivo com múltiplas abas
   em réplicas diferentes (mesmo método usado no projeto inteiro até aqui)
-  — avatar aparecendo no servidor certo, pulso disparando em mensagem e
+ : avatar aparecendo no servidor certo, pulso disparando em mensagem e
   em entrar/sair, e mensagem privada de terceiro realmente anônima na
   tela.

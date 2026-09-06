@@ -14,12 +14,12 @@ export interface VisualizerPulse {
   replica?: string;           // connect/disconnect
   fromReplica?: string;       // geral/privada
   toReplicas?: string[];      // geral (leque) ou privada (pode ter mais de uma réplica)
-  userName?: string;          // connect/disconnect/geral — nunca em privada
+  userName?: string;          // connect/disconnect/geral, nunca em privada
 }
 
 @Injectable({ providedIn: 'root' })
 export class ChatService {
-  // Duração de cada "perna" da jornada do pulso no painel do visualizador —
+  // Duração de cada "perna" da jornada do pulso no painel do visualizador:
   // precisa bater com HOP_MS em visualizer-panel.component.ts e com a duração
   // da animação em @keyframes viz-flow-down/viz-flow-up no styles.scss. Uma
   // mensagem percorre até 6 pernas (pessoa → nginx → servidor → redis → outro
@@ -39,7 +39,7 @@ export class ChatService {
   readonly visualizerPulses = signal<VisualizerPulse[]>([]);
   // Preenchido quando o servidor recusa a entrada (nome inválido ou já em
   // uso). Quem consome isso (ChatRoomComponent) precisa reagir de forma
-  // reativa — start() já resolveu com sucesso antes desse evento chegar,
+  // reativa; start() já resolveu com sucesso antes desse evento chegar,
   // então não dá pra simplesmente capturar isso como um erro do connect().
   readonly joinError = signal<string | null>(null);
 
@@ -64,7 +64,7 @@ export class ChatService {
     this.connection = new signalR.HubConnectionBuilder()
       // skipNegotiation + WebSockets-only: sem isso, o cliente faz um POST
       // /negotiate separado antes do upgrade de WebSocket, e sem sticky sessions
-      // o Nginx pode mandar cada requisição pra uma réplica diferente — a segunda
+      // o Nginx pode mandar cada requisição pra uma réplica diferente; a segunda
       // rejeita a conexão porque o connectionId só existe na réplica que negociou.
       // Pulando a negociação, a conexão vira uma única requisição atômica.
       .withUrl(`/chatHub?user=${encodeURIComponent(userName)}`, {
@@ -97,7 +97,7 @@ export class ChatService {
         next.set(fromUser, [...existing, { userName: fromUser, message, replica, timestamp }]);
         return next;
       });
-      // Marca como não lida sempre — quem estiver com a conversa aberta na hora
+      // Marca como não lida sempre; quem estiver com a conversa aberta na hora
       // limpa isso de volta imediatamente (ver efeito em ChatRoomComponent), então
       // na prática só fica marcado quem realmente não está olhando aquela conversa.
       this.unreadPrivate.update(set => new Set(set).add(fromUser));
@@ -141,7 +141,7 @@ export class ChatService {
       this.joinError.set(reason);
       // Chamar stop() explicitamente (em vez de deixar a conexão cair
       // "sozinha") é o que impede o withAutomaticReconnect() de tentar de
-      // novo — reconexão automática só dispara quando a conexão cai de
+      // novo; reconexão automática só dispara quando a conexão cai de
       // forma inesperada, nunca depois de um stop() intencional. Sem isso,
       // o cliente ficaria reconectando (e sendo recusado de novo) num loop
       // silencioso, sem nunca mostrar erro nenhum.
@@ -168,7 +168,7 @@ export class ChatService {
     await this.connection?.invoke('SendPrivateMessage', toUserName, message);
 
     // O servidor não ecoa a mensagem de volta pra quem manda (só entrega pro
-    // destinatário) — um eco não teria como carregar "pra quem eu mandei" de forma
+    // destinatário); um eco não teria como carregar "pra quem eu mandei" de forma
     // inequívoca. Como já sabemos localmente o que mandamos e pra quem, adicionamos
     // na nossa própria conversa assim que o envio é confirmado.
     this.privateMessages.update(map => {
@@ -189,7 +189,7 @@ export class ChatService {
 
     // Conectar/desconectar percorre 2 pernas (pessoa↔nginx↔servidor); mensagem
     // geral ou privada percorre até 6 (pessoa→nginx→servidor→redis→outro
-    // servidor→nginx→outra pessoa) — ver VisualizerPanelComponent.legsFor.
+    // servidor→nginx→outra pessoa). Ver VisualizerPanelComponent.legsFor.
     const totalLegs = pulse.kind === 'connect' || pulse.kind === 'disconnect' ? 2 : 6;
     setTimeout(() => {
       this.visualizerPulses.update(pulses => pulses.filter(p => p.id !== id));

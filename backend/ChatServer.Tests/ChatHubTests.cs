@@ -64,7 +64,7 @@ public class ChatHubTests
 
         await hub.OnConnectedAsync();
 
-        // Não chama Context.Abort() de propósito — ver comentário em
+        // Não chama Context.Abort() de propósito, ver comentário em
         // ChatHub.OnConnectedAsync sobre a corrida entre SendAsync e Abort().
         Assert.False(((FakeHubCallerContext)hub.Context).WasAborted);
         Assert.False(context.Items.ContainsKey("Joined"));
@@ -111,7 +111,7 @@ public class ChatHubTests
     public async Task OnDisconnectedAsync_ForConnectionThatWasNeverJoined_DoesNotTouchPresence()
     {
         // Simula o disconnect eventual de uma conexão que foi recusada em
-        // OnConnectedAsync (nome já em uso, por exemplo) — ela nunca chamou
+        // OnConnectedAsync (nome já em uso, por exemplo); ela nunca chamou
         // AddUserAsync nem entrou em nenhum grupo, então o disconnect dela não
         // pode decrementar a presença de ninguém.
         var presence = new Mock<IRoomPresenceService>();
@@ -325,7 +325,7 @@ public class ChatHubTests
         await hub.SendPrivateMessage("Bob", "oi Bob, so pra voce");
 
         // Garante, com contagem exata de campos, que o payload NUNCA carrega nome
-        // nem conteúdo de mensagem privada de terceiros — só nomes de réplica.
+        // nem conteúdo de mensagem privada de terceiros, só nomes de réplica.
         visualizerProxy.Verify(
             p => p.SendCoreAsync(
                 "VisualizerPrivateMessage",
