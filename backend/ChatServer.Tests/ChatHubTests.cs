@@ -46,6 +46,39 @@ public class ChatHubTests
     }
 
     [Fact]
+    public async Task OnConnectedAsync_TellsCallerWhichReplicaAnsweredTheConnection()
+    {
+        var presence = new Mock<IRoomPresenceService>();
+        presence.Setup(p => p.AddUserAsync(It.IsAny<string>(), It.IsAny<string>()))
+            .ReturnsAsync(new List<string> { "Ana" });
+        presence.Setup(p => p.GetUsersAsync(It.IsAny<string>()))
+            .ReturnsAsync(new List<string>());
+
+        var callerProxy = new Mock<ISingleClientProxy>();
+        var clients = new Mock<IHubCallerClients>();
+        clients.Setup(c => c.Caller).Returns(callerProxy.Object);
+        clients.Setup(c => c.OthersInGroup(It.IsAny<string>())).Returns(Mock.Of<IClientProxy>());
+
+        var hub = new ChatHub(Mock.Of<ILogger<ChatHub>>(), BuildConfig(), presence.Object)
+        {
+            Groups = Mock.Of<IGroupManager>(),
+            Clients = clients.Object,
+            Context = new FakeHubCallerContext("conn-1", "Ana")
+        };
+
+        await hub.OnConnectedAsync();
+
+        // O nome vem da configuração REPLICA_NAME (ver BuildConfig), que em
+        // produção é definida por réplica no docker-compose.yml.
+        callerProxy.Verify(
+            c => c.SendCoreAsync(
+                "ConnectedToReplica",
+                It.Is<object[]>(a => (string)a[0]! == "test-replica"),
+                It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Fact]
     public async Task OnConnectedAsync_WithNoUserIdentifier_RejectsJoin_AndDoesNotJoinOrNotify()
     {
         var presence = new Mock<IRoomPresenceService>();

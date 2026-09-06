@@ -105,6 +105,23 @@ import { IconComponent } from '../../components/icon/icon.component';
             }
           </div>
           <div class="header-actions">
+            <!-- Sinais lidos direto no template, não copiados pra campo comum:
+                 quem muda esses valores são retornos de chamada do SignalR, que
+                 rodam fora do fluxo normal do Angular. Ver o comentário em
+                 sidebarWidth mais abaixo. -->
+            <span
+              class="server-badge"
+              [class.is-down]="chatService.connectionState() !== 'conectado'"
+              [title]="connectionHint()"
+            >
+              <span class="server-dot" aria-hidden="true"></span>
+              @if (chatService.myReplica(); as replica) {
+                <app-icon name="server" />
+                <span class="server-badge-text">{{ replica }}</span>
+              } @else {
+                <span class="server-badge-text">{{ chatService.connectionState() }}</span>
+              }
+            </span>
             <button
               class="theme-toggle"
               type="button"
@@ -289,6 +306,25 @@ export class ChatRoomComponent implements OnInit {
     this.errorMessage = '';
     this.chatService.markPrivateRead(user);
     this.showSidebarMobile = false;
+  }
+
+  // Texto do balão de ajuda do selo. Explica o que aquele nome de servidor
+  // significa, que é o ponto do recurso: mostrar que a conexão foi parar numa
+  // réplica específica e que derrubar essa réplica joga você em outra.
+  connectionHint(): string {
+    const replica = this.chatService.myReplica();
+    switch (this.chatService.connectionState()) {
+      case 'conectado':
+        return replica
+          ? `Sua conexão foi para o ${replica}. O Nginx escolheu ele por ter menos conexões abertas no momento; se ele cair, você reconecta em outro.`
+          : 'Conectado.';
+      case 'reconectando':
+        return 'A conexão caiu e está sendo refeita. Ao voltar, o Nginx pode entregar você para outro servidor.';
+      case 'desconectado':
+        return 'Sem conexão com o servidor.';
+      default:
+        return 'Conectando ao servidor...';
+    }
   }
 
   otherOnlineUsers(): string[] {

@@ -17,6 +17,8 @@ export interface VisualizerPulse {
   userName?: string;          // connect/disconnect/geral, nunca em privada
 }
 
+export type ConnectionState = 'conectando' | 'conectado' | 'reconectando' | 'desconectado';
+
 @Injectable({ providedIn: 'root' })
 export class ChatService {
   // Duração de cada "perna" da jornada do pulso no painel do visualizador:
@@ -43,6 +45,13 @@ export class ChatService {
   // então não dá pra simplesmente capturar isso como um erro do connect().
   readonly joinError = signal<string | null>(null);
 
+  // Qual das réplicas atendeu ESTA conexão, informado pelo servidor em
+  // OnConnectedAsync. Volta pra null enquanto a conexão está caída: nesse
+  // intervalo não há servidor nenhum atendendo, e ao reconectar o load
+  // balancer escolhe de novo, então pode vir outro.
+  readonly myReplica = signal<string | null>(null);
+  readonly connectionState = signal<ConnectionState>('conectando');
+
   get isConnected(): boolean {
     return this.connection?.state === signalR.HubConnectionState.Connected;
   }
@@ -60,6 +69,8 @@ export class ChatService {
     this.replicaUsers.set(new Map());
     this.visualizerPulses.set([]);
     this.joinError.set(null);
+    this.myReplica.set(null);
+    this.connectionState.set('conectando');
 
     this.connection = new signalR.HubConnectionBuilder()
       // skipNegotiation + WebSockets-only: sem isso, o cliente faz um POST
@@ -76,6 +87,10 @@ export class ChatService {
 
     this.connection.on('RoomJoined', (users: string[]) => {
       this.onlineUsers.set(users);
+    });
+
+    this.connection.on('ConnectedToReplica', (replica: string) => {
+      this.myReplica.set(replica);
     });
 
     this.connection.on('UserJoined', (joinedUser: string) => {
@@ -148,7 +163,28 @@ export class ChatService {
       void this.connection?.stop();
     });
 
+    // A reconexão automática é o que torna a queda de uma réplica indolor: o
+    // cliente refaz a conexão sozinho e o Nginx a entrega pra outro servidor.
+    // Enquanto isso não termina, quem está usando merece ver o que está
+    // acontecendo em vez de uma tela que simplesmente parou de responder.
+    this.connection.onreconnecting(() => {
+      this.connectionState.set('reconectando');
+      this.myReplica.set(null);
+    });
+
+    this.connection.onreconnected(() => {
+      // Não marca a réplica aqui: o servidor manda "ConnectedToReplica" de
+      // novo em OnConnectedAsync, e é de lá que o nome vem.
+      this.connectionState.set('conectado');
+    });
+
+    this.connection.onclose(() => {
+      this.connectionState.set('desconectado');
+      this.myReplica.set(null);
+    });
+
     await this.connection.start();
+    this.connectionState.set('conectado');
   }
 
   markPrivateRead(userName: string): void {

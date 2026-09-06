@@ -82,6 +82,12 @@ public class ChatHub : Hub
         _logger.LogInformation("[{Replica}] {User} entrou na Sala Geral", _replicaName, userName);
 
         await Clients.Caller.SendAsync("RoomJoined", onlineUsers);
+        // Qual réplica atendeu ESTA conexão. O visualizador já mostra onde todo
+        // mundo caiu, mas quem está usando não tem como saber onde caiu a própria
+        // conexão, que é justamente o que torna o balanceamento perceptível: ao
+        // derrubar uma réplica (docker compose stop backend2), dá pra ver a
+        // reconexão trazer um servidor diferente aqui.
+        await Clients.Caller.SendAsync("ConnectedToReplica", _replicaName);
         await Clients.OthersInGroup(GeralRoom).SendAsync("UserJoined", userName, _replicaName);
 
         var snapshot = new Dictionary<string, string[]>();

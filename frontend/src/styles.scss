@@ -818,6 +818,56 @@ app-visualizer-panel {
   margin-top: 0;
 }
 
+/* Selo de "onde a minha conexão caiu". O visualizador ao lado mostra a
+   posição de todo mundo; este selo responde a pergunta que faltava, que é
+   em qual réplica está você. Some no celular, onde o cabeçalho não tem
+   largura pra ele. */
+.server-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.3rem 0.7rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  white-space: nowrap;
+  cursor: help;
+
+  app-icon {
+    font-size: 0.9rem;
+    color: var(--accent);
+  }
+
+  .server-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: #22c55e;
+    flex-shrink: 0;
+  }
+
+  /* Reconectando ou fora do ar: a bolinha pisca em âmbar, pra a queda ser
+     percebida de canto de olho sem precisar ler o texto. */
+  &.is-down {
+    .server-dot {
+      background: #f59e0b;
+      animation: server-pulse 1s ease-in-out infinite;
+    }
+
+    .server-badge-text {
+      text-transform: capitalize;
+    }
+  }
+}
+
+@keyframes server-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.25; }
+}
+
 .header-actions {
   display: flex;
   align-items: center;
@@ -866,6 +916,12 @@ app-visualizer-panel {
 
   .sidebar-toggle {
     display: inline-flex;
+  }
+
+  /* O cabeçalho no celular já disputa espaço entre menu, título e dois
+     botões; o selo sai daqui e a informação continua no visualizador. */
+  .server-badge {
+    display: none;
   }
 
   /* Arrastar só existe em tela grande (os painéis viram flutuante/split-view
