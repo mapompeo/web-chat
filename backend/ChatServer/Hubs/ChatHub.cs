@@ -5,23 +5,37 @@ namespace ChatServer.Hubs;
 
 public class ChatHub : Hub
 {
-    private const string GeralRoom = "Geral";
-    private const string VisualizerGroup = "Visualizador";
+    // Publicas porque o ReplicaHeartbeatService precisa avisar os mesmos
+    // grupos quando limpa a presenca de uma replica que morreu.
+    public const string GeralRoom = "Geral";
+    public const string VisualizerGroup = "Visualizador";
 
     // A topologia deste projeto é sempre fixa (é um estudo de escalonamento com 3
     // réplicas, não um sistema com número variável de instâncias), por isso os
     // nomes ficam hardcoded aqui, espelhando os valores de REPLICA_NAME no
     // docker-compose.yml. Se um dia mudarem, os dois lugares precisam acompanhar.
-    private static readonly string[] AllReplicaNames = ["Servidor A", "Servidor B", "Servidor C"];
+    public static readonly string[] AllReplicaNames = ["Servidor A", "Servidor B", "Servidor C"];
 
     private readonly ILogger<ChatHub> _logger;
     private readonly IRoomPresenceService _presence;
+    private readonly IReplicaRegistry _replicas;
+    private readonly IMessageHistoryService _history;
+    private readonly INameOwnershipService _names;
     private readonly string _replicaName;
 
-    public ChatHub(ILogger<ChatHub> logger, IConfiguration configuration, IRoomPresenceService presence)
+    public ChatHub(
+        ILogger<ChatHub> logger,
+        IConfiguration configuration,
+        IRoomPresenceService presence,
+        IReplicaRegistry replicas,
+        IMessageHistoryService history,
+        INameOwnershipService names)
     {
         _logger = logger;
         _presence = presence;
+        _replicas = replicas;
+        _history = history;
+        _names = names;
         _replicaName = configuration["REPLICA_NAME"] ?? "local";
     }
 
@@ -59,12 +73,37 @@ public class ChatHub : Hub
         // corrida estreita aqui (duas pessoas entrando com o mesmo nome bem no
         // mesmo instante podem ambas passar por essa checagem antes de
         // qualquer uma ser contada); aceitável pro escopo deste projeto.
-        var existingUsers = await _presence.GetUsersAsync(GeralRoom);
-        if (existingUsers.Contains(userName))
+        //
+        // A pergunta certa é "esse nome pertence a OUTRO cliente?", e não "esse
+        // nome aparece na presença?".
+        //
+        // Tentamos antes pela presença, e depois só pelas réplicas vivas, e as
+        // duas versões falhavam no mesmo ponto: quando uma réplica morre de
+        // repente, o registro que a pessoa deixou lá continua existindo por
+        // alguns segundos, e a reconexão automática dela (que começa na hora)
+        // batia nesse próprio registro e era recusada com "esse nome já está em
+        // uso". Verificado ao vivo: matando o container com SIGKILL, a pessoa
+        // era expulsa de si mesma.
+        //
+        // O identificador do cliente vem da aba do navegador e sobrevive à
+        // reconexão, então reconectar é sempre permitido, e duas pessoas
+        // diferentes com o mesmo nome continuam sendo barradas.
+        var clientId = Context.GetHttpContext()?.Request.Query["client"].ToString();
+        if (string.IsNullOrWhiteSpace(clientId))
+        {
+            // Cliente antigo ou chamada fora do app: cai no identificador da
+            // própria conexão, que é único, então ele nunca "reconecta" no
+            // sentido acima, mas também nunca rouba o nome de ninguém.
+            clientId = Context.ConnectionId;
+        }
+
+        if (!await _names.TryClaimAsync(GeralRoom, userName, clientId))
         {
             await Clients.Caller.SendAsync("JoinRejected", "Esse nome já está em uso por outra pessoa. Escolha outro nome.");
             return;
         }
+
+        Context.Items["ClientId"] = clientId;
 
         // Marca que essa conexão realmente entrou (presença contada, grupos
         // entrados); OnDisconnectedAsync usa isso pra saber se tem alguma
@@ -73,6 +112,13 @@ public class ChatHub : Hub
         // RemoveUserAsync mesmo nunca tendo chamado AddUserAsync, decrementando
         // por engano a contagem de uma conexão de verdade com o mesmo nome.
         Context.Items["Joined"] = true;
+
+        // Mandado ANTES de entrar no grupo, pela mesma razao do snapshot do
+        // visualizador mais abaixo: assim nao existe janela em que uma mensagem
+        // ao vivo chegue antes do historico e acabe sobrescrita quando ele
+        // preencher a lista.
+        var history = await _history.GetRecentAsync(GeralRoom);
+        await Clients.Caller.SendAsync("RoomHistory", history);
 
         await Groups.AddToGroupAsync(Context.ConnectionId, GeralRoom);
 
@@ -123,6 +169,13 @@ public class ChatHub : Hub
         var timestamp = DateTimeOffset.UtcNow.ToString("o");
         await Clients.Group(GeralRoom).SendAsync("ReceiveMessage", userName, message, _replicaName, timestamp);
 
+        // Guardado depois da entrega, nao antes: se o Redis engasgar aqui, quem
+        // esta online ja recebeu a mensagem, e o pior caso vira uma falha no
+        // historico e nao uma mensagem que ninguem recebeu.
+        await _history.AddAsync(
+            GeralRoom,
+            new StoredMessage(userName, message, _replicaName, timestamp));
+
         var activeReplicas = await GetActiveReplicasAsync();
         await Clients.Group(VisualizerGroup).SendAsync("VisualizerGeralMessage", _replicaName, userName, activeReplicas);
     }
@@ -155,8 +208,17 @@ public class ChatHub : Hub
         // mesmo nome (ver Context.Items["Joined"] em OnConnectedAsync).
         if (!string.IsNullOrEmpty(userName) && Context.Items.ContainsKey("Joined"))
         {
-            await _presence.RemoveUserAsync(GeralRoom, userName);
+            var remainingInRoom = await _presence.RemoveUserAsync(GeralRoom, userName);
             var remainingInReplica = await _presence.RemoveUserAsync(_replicaName, userName);
+
+            // Só devolve o nome quando some a última conexão dessa pessoa em
+            // qualquer réplica; enquanto restar alguma, o nome segue sendo dela.
+            if (!remainingInRoom.Contains(userName)
+                && Context.Items.TryGetValue("ClientId", out var clientId)
+                && clientId is string id)
+            {
+                await _names.ReleaseAsync(GeralRoom, userName, id);
+            }
 
             _logger.LogInformation("[{Replica}] {User} saiu da Sala Geral", _replicaName, userName);
 

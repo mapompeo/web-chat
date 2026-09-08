@@ -60,31 +60,34 @@ para o tema claro. A escolha fica salva em `localStorage` e persiste entre recar
 
 ## Limitações conhecidas (fora de escopo deliberado)
 
-- Sem autenticação e sem persistência de histórico de mensagens; recarregar a página (F5)
-  limpa as conversas visíveis (Geral e privadas), embora a conexão em si se recupere sozinha
-  (ver próximo ponto). Duas pessoas com o mesmo nome colidem, já que "nome de usuário" é só
-  um texto digitado, sem senha.
+- Sem autenticação: "nome de usuário" é só um texto digitado, sem senha.
+- A Sala Geral guarda as últimas 50 mensagens no Redis, o suficiente para recarregar a
+  página (F5) não cair numa tela vazia. Continua efêmero: a lista tem tamanho fixo, prazo de
+  validade e some junto com o Redis. Conversa privada NÃO é guardada, de propósito, porque
+  armazenar conteúdo endereçado a uma pessoa é outra decisão, com outras implicações; o
+  projeto trata mensagem privada como anônima até no visualizador.
 - Ao recarregar a aba (F5), a reconexão funciona: o backend registra a saída da conexão
   antiga e a entrada da nova (possivelmente em outra réplica), e a Sala Geral é reentrada
   sozinha, porque `OnConnectedAsync` sempre adiciona a conexão à Sala Geral, em toda conexão
   nova. Só se perde o estado local de interface (histórico exibido), não a participação.
-- **A queda de uma réplica, porém, hoje expulsa quem estava nela.** Quando o processo morre
-  de repente, ele não roda `OnDisconnectedAsync`, então a presença daquela pessoa fica órfã
-  no Redis. A reconexão automática cai em outra réplica, a checagem de nome único encontra o
-  registro órfão e recusa a entrada com "esse nome já está em uso", e o cliente encerra a
-  conexão. Ou seja, derrubar uma réplica não produz failover; produz expulsão. A correção
-  seria trocar a pergunta "esse nome existe na presença?" por "esse nome está numa réplica
-  que ainda está viva?", com um heartbeat curto por réplica no Redis. Está mapeado e ainda
-  não foi feito.
+- A queda de uma réplica é absorvida: quem estava nela reconecta em outra, sem perder as
+  mensagens. Verificado matando o container com `docker compose kill`, que não dá ao processo
+  a chance de encerrar de forma limpa. Isso exigiu duas peças, descritas em
+  `Services/IReplicaRegistry.cs` e `Services/INameOwnershipService.cs`: cada réplica anuncia
+  periodicamente que está viva e as demais limpam a presença órfã de quem parou de anunciar;
+  e cada aba manda um identificador estável, para a checagem de nome único perguntar "esse
+  nome pertence a outro?" em vez de "esse nome existe?". Sem a segunda peça, a reconexão
+  (que começa imediatamente) batia no registro que a própria pessoa tinha acabado de deixar
+  e era recusada com "esse nome já está em uso".
 - Mensagem privada mandada pra alguém que caiu da conexão bem na hora do envio simplesmente
   não chega: não há fila, retry, nem notificação de falha pro remetente.
 - A presença (lista de "quem está online") usa uma chave Redis com TTL de 4h como rede de
   segurança, não um heartbeat de verdade; se o processo do backend morrer sem rodar
   `OnDisconnectedAsync`, o usuário some da lista só quando o TTL expirar, não instantaneamente.
-  Um efeito colateral disso vale conhecer ao olhar o visualizador: ele desenha a presença
-  registrada no Redis, enquanto o `least_conn` do Nginx decide pelas conexões TCP que ele
-  mantém abertas. São contagens diferentes, e conforme fantasmas se acumulam elas divergem,
-  fazendo o balanceador parecer errado quando está certo. `docker compose restart` limpa.
+  Na prática isso é coberto pela varredura de réplicas mortas descrita acima, que remove a
+  presença órfã em cerca de 15 segundos. Vale saber, ao comparar números: o visualizador
+  desenha a presença registrada no Redis, enquanto o `least_conn` do Nginx decide pelas
+  conexões TCP que ele mantém abertas, então são contagens de coisas diferentes.
 
 ## Deploy
 

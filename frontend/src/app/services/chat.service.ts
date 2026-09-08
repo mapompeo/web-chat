@@ -52,6 +52,42 @@ export class ChatService {
   readonly myReplica = signal<string | null>(null);
   readonly connectionState = signal<ConnectionState>('conectando');
 
+  // Identificador da ABA, não da pessoa. O servidor usa isto pra saber que uma
+  // conexão nova com um nome já ocupado é a mesma aba voltando (reconexão
+  // automática depois de uma réplica cair) e não outra pessoa querendo o mesmo
+  // nome. Fica em sessionStorage de propósito: sobrevive a recarregar a página
+  // e à reconexão, mas cada aba tem o seu, então abrir uma segunda aba com o
+  // mesmo nome continua sendo recusado, como antes.
+  private static clientId(): string {
+    const chave = 'chat-client-id';
+    let id = sessionStorage.getItem(chave);
+    if (!id) {
+      id = ChatService.randomId();
+      sessionStorage.setItem(chave, id);
+    }
+    return id;
+  }
+
+  // crypto.randomUUID() só existe em "contexto seguro", ou seja, HTTPS ou
+  // localhost. Abrindo o chat pelo IP da máquina na rede local
+  // (http://192.168.x.x), que é justamente como se testa em outro aparelho,
+  // ela vem indefinida: chamar direto derrubava o connect() inteiro com
+  // TypeError, e a tela de entrada mostrava isso como "não foi possível
+  // conectar ao backend", apontando pro lugar errado. crypto.getRandomValues,
+  // por outro lado, existe em qualquer contexto, e o valor só precisa ser
+  // único por aba, não criptograficamente perfeito.
+  private static randomId(): string {
+    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+      return crypto.randomUUID();
+    }
+    if (typeof crypto !== 'undefined' && typeof crypto.getRandomValues === 'function') {
+      const bytes = new Uint8Array(16);
+      crypto.getRandomValues(bytes);
+      return Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
+    }
+    return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+  }
+
   get isConnected(): boolean {
     return this.connection?.state === signalR.HubConnectionState.Connected;
   }
@@ -78,7 +114,7 @@ export class ChatService {
       // o Nginx pode mandar cada requisição pra uma réplica diferente; a segunda
       // rejeita a conexão porque o connectionId só existe na réplica que negociou.
       // Pulando a negociação, a conexão vira uma única requisição atômica.
-      .withUrl(`/chatHub?user=${encodeURIComponent(userName)}`, {
+      .withUrl(`/chatHub?user=${encodeURIComponent(userName)}&client=${encodeURIComponent(ChatService.clientId())}`, {
         skipNegotiation: true,
         transport: signalR.HttpTransportType.WebSockets
       })
@@ -91,6 +127,15 @@ export class ChatService {
 
     this.connection.on('ConnectedToReplica', (replica: string) => {
       this.myReplica.set(replica);
+    });
+
+    // As últimas mensagens da sala, mandadas pelo servidor assim que a conexão
+    // entra. É o que faz recarregar a página (F5) não cair mais numa tela em
+    // branco. Chega ANTES de qualquer "ReceiveMessage" ao vivo, porque o
+    // servidor manda o histórico antes de colocar a conexão no grupo, então
+    // aqui pode substituir a lista sem risco de apagar algo recém-chegado.
+    this.connection.on('RoomHistory', (history: ChatMessage[]) => {
+      this.geralMessages.set(history ?? []);
     });
 
     this.connection.on('UserJoined', (joinedUser: string) => {

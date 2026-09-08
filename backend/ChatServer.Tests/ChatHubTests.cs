@@ -27,7 +27,7 @@ public class ChatHubTests
         clients.Setup(c => c.Caller).Returns(callerProxy.Object);
         clients.Setup(c => c.OthersInGroup(It.IsAny<string>())).Returns(Mock.Of<IClientProxy>());
 
-        var hub = new ChatHub(Mock.Of<ILogger<ChatHub>>(), BuildConfig(), presence.Object)
+        var hub = new ChatHub(Mock.Of<ILogger<ChatHub>>(), BuildConfig(), presence.Object, AllReplicasAlive(), Mock.Of<IMessageHistoryService>(), FreeNames())
         {
             Groups = groups.Object,
             Clients = clients.Object,
@@ -59,7 +59,7 @@ public class ChatHubTests
         clients.Setup(c => c.Caller).Returns(callerProxy.Object);
         clients.Setup(c => c.OthersInGroup(It.IsAny<string>())).Returns(Mock.Of<IClientProxy>());
 
-        var hub = new ChatHub(Mock.Of<ILogger<ChatHub>>(), BuildConfig(), presence.Object)
+        var hub = new ChatHub(Mock.Of<ILogger<ChatHub>>(), BuildConfig(), presence.Object, AllReplicasAlive(), Mock.Of<IMessageHistoryService>(), FreeNames())
         {
             Groups = Mock.Of<IGroupManager>(),
             Clients = clients.Object,
@@ -88,7 +88,7 @@ public class ChatHubTests
         clients.Setup(c => c.Caller).Returns(callerProxy.Object);
 
         var context = new FakeHubCallerContext("conn-1", null);
-        var hub = new ChatHub(Mock.Of<ILogger<ChatHub>>(), BuildConfig(), presence.Object)
+        var hub = new ChatHub(Mock.Of<ILogger<ChatHub>>(), BuildConfig(), presence.Object, AllReplicasAlive(), Mock.Of<IMessageHistoryService>(), FreeNames())
         {
             Groups = groups.Object,
             Clients = clients.Object,
@@ -113,8 +113,10 @@ public class ChatHubTests
     [Fact]
     public async Task OnConnectedAsync_WithNameAlreadyTaken_RejectsJoin_AndDoesNotJoinOrNotify()
     {
+        // O nome pertence a OUTRO cliente, entao a reserva falha.
         var presence = new Mock<IRoomPresenceService>();
-        presence.Setup(p => p.GetUsersAsync("Geral")).ReturnsAsync(new List<string> { "Ana" });
+        var names = new Mock<INameOwnershipService>();
+        names.Setup(n => n.TryClaimAsync("Geral", "Ana", It.IsAny<string>())).ReturnsAsync(false);
 
         var groups = new Mock<IGroupManager>();
         var callerProxy = new Mock<ISingleClientProxy>();
@@ -122,7 +124,7 @@ public class ChatHubTests
         clients.Setup(c => c.Caller).Returns(callerProxy.Object);
 
         var context = new FakeHubCallerContext("conn-2", "Ana");
-        var hub = new ChatHub(Mock.Of<ILogger<ChatHub>>(), BuildConfig(), presence.Object)
+        var hub = new ChatHub(Mock.Of<ILogger<ChatHub>>(), BuildConfig(), presence.Object, AllReplicasAlive(), Mock.Of<IMessageHistoryService>(), names.Object)
         {
             Groups = groups.Object,
             Clients = clients.Object,
@@ -150,7 +152,7 @@ public class ChatHubTests
         var presence = new Mock<IRoomPresenceService>();
         var clients = new Mock<IHubCallerClients>();
 
-        var hub = new ChatHub(Mock.Of<ILogger<ChatHub>>(), BuildConfig(), presence.Object)
+        var hub = new ChatHub(Mock.Of<ILogger<ChatHub>>(), BuildConfig(), presence.Object, AllReplicasAlive(), Mock.Of<IMessageHistoryService>(), FreeNames())
         {
             Clients = clients.Object,
             Context = new FakeHubCallerContext("conn-rejected", "Ana")
@@ -177,7 +179,7 @@ public class ChatHubTests
         clients.Setup(c => c.Caller).Returns(callerProxy.Object);
         clients.Setup(c => c.OthersInGroup(It.IsAny<string>())).Returns(Mock.Of<IClientProxy>());
 
-        var hub = new ChatHub(Mock.Of<ILogger<ChatHub>>(), BuildConfig(), presence.Object)
+        var hub = new ChatHub(Mock.Of<ILogger<ChatHub>>(), BuildConfig(), presence.Object, AllReplicasAlive(), Mock.Of<IMessageHistoryService>(), FreeNames())
         {
             Groups = groups.Object,
             Clients = clients.Object,
@@ -207,7 +209,7 @@ public class ChatHubTests
         clients.Setup(c => c.OthersInGroup("Geral")).Returns(Mock.Of<IClientProxy>());
         clients.Setup(c => c.OthersInGroup("Visualizador")).Returns(othersVisualizerProxy.Object);
 
-        var hub = new ChatHub(Mock.Of<ILogger<ChatHub>>(), BuildConfig(), presence.Object)
+        var hub = new ChatHub(Mock.Of<ILogger<ChatHub>>(), BuildConfig(), presence.Object, AllReplicasAlive(), Mock.Of<IMessageHistoryService>(), FreeNames())
         {
             Groups = groups.Object,
             Clients = clients.Object,
@@ -247,7 +249,7 @@ public class ChatHubTests
         clients.Setup(c => c.Group("Geral")).Returns(groupProxy.Object);
         clients.Setup(c => c.Group("Visualizador")).Returns(Mock.Of<IClientProxy>());
 
-        var hub = new ChatHub(Mock.Of<ILogger<ChatHub>>(), BuildConfig(), presence.Object)
+        var hub = new ChatHub(Mock.Of<ILogger<ChatHub>>(), BuildConfig(), presence.Object, AllReplicasAlive(), Mock.Of<IMessageHistoryService>(), FreeNames())
         {
             Clients = clients.Object,
             Context = new FakeHubCallerContext("conn-1", "Ana")
@@ -282,7 +284,7 @@ public class ChatHubTests
         clients.Setup(c => c.Group("Geral")).Returns(groupProxy.Object);
         clients.Setup(c => c.Group("Visualizador")).Returns(visualizerProxy.Object);
 
-        var hub = new ChatHub(Mock.Of<ILogger<ChatHub>>(), BuildConfig(), presence.Object)
+        var hub = new ChatHub(Mock.Of<ILogger<ChatHub>>(), BuildConfig(), presence.Object, AllReplicasAlive(), Mock.Of<IMessageHistoryService>(), FreeNames())
         {
             Clients = clients.Object,
             Context = new FakeHubCallerContext("conn-1", "Ana")
@@ -314,7 +316,7 @@ public class ChatHubTests
         clients.Setup(c => c.User("Bob")).Returns(targetProxy.Object);
         clients.Setup(c => c.Group("Visualizador")).Returns(Mock.Of<IClientProxy>());
 
-        var hub = new ChatHub(Mock.Of<ILogger<ChatHub>>(), BuildConfig(), presence.Object)
+        var hub = new ChatHub(Mock.Of<ILogger<ChatHub>>(), BuildConfig(), presence.Object, AllReplicasAlive(), Mock.Of<IMessageHistoryService>(), FreeNames())
         {
             Clients = clients.Object,
             Context = new FakeHubCallerContext("conn-1", "Ana")
@@ -349,7 +351,7 @@ public class ChatHubTests
         clients.Setup(c => c.User("Bob")).Returns(targetProxy.Object);
         clients.Setup(c => c.Group("Visualizador")).Returns(visualizerProxy.Object);
 
-        var hub = new ChatHub(Mock.Of<ILogger<ChatHub>>(), BuildConfig(), presence.Object)
+        var hub = new ChatHub(Mock.Of<ILogger<ChatHub>>(), BuildConfig(), presence.Object, AllReplicasAlive(), Mock.Of<IMessageHistoryService>(), FreeNames())
         {
             Clients = clients.Object,
             Context = new FakeHubCallerContext("conn-1", "Ana")
@@ -386,7 +388,7 @@ public class ChatHubTests
 
         var context = new FakeHubCallerContext("conn-1", "Ana");
         context.Items["Joined"] = true;
-        var hub = new ChatHub(Mock.Of<ILogger<ChatHub>>(), BuildConfig(), presence.Object)
+        var hub = new ChatHub(Mock.Of<ILogger<ChatHub>>(), BuildConfig(), presence.Object, AllReplicasAlive(), Mock.Of<IMessageHistoryService>(), FreeNames())
         {
             Clients = clients.Object,
             Context = context
@@ -418,7 +420,7 @@ public class ChatHubTests
 
         var context = new FakeHubCallerContext("conn-1", "Ana");
         context.Items["Joined"] = true;
-        var hub = new ChatHub(Mock.Of<ILogger<ChatHub>>(), BuildConfig(), presence.Object)
+        var hub = new ChatHub(Mock.Of<ILogger<ChatHub>>(), BuildConfig(), presence.Object, AllReplicasAlive(), Mock.Of<IMessageHistoryService>(), FreeNames())
         {
             Clients = clients.Object,
             Context = context
@@ -444,7 +446,7 @@ public class ChatHubTests
 
         var context = new FakeHubCallerContext("conn-1", "Ana");
         context.Items["Joined"] = true;
-        var hub = new ChatHub(Mock.Of<ILogger<ChatHub>>(), BuildConfig(), presence.Object)
+        var hub = new ChatHub(Mock.Of<ILogger<ChatHub>>(), BuildConfig(), presence.Object, AllReplicasAlive(), Mock.Of<IMessageHistoryService>(), FreeNames())
         {
             Clients = clients.Object,
             Context = context
@@ -477,7 +479,7 @@ public class ChatHubTests
 
         var context = new FakeHubCallerContext("conn-1", "Ana");
         context.Items["Joined"] = true;
-        var hub = new ChatHub(Mock.Of<ILogger<ChatHub>>(), BuildConfig(), presence.Object)
+        var hub = new ChatHub(Mock.Of<ILogger<ChatHub>>(), BuildConfig(), presence.Object, AllReplicasAlive(), Mock.Of<IMessageHistoryService>(), FreeNames())
         {
             Clients = clients.Object,
             Context = context
@@ -491,6 +493,158 @@ public class ChatHubTests
                 It.IsAny<object[]>(),
                 It.IsAny<CancellationToken>()),
             Times.Never);
+    }
+
+    [Fact]
+    public async Task OnConnectedAsync_WhenTheSameClientReconnects_AllowsTheJoinEvenWithTheNameTaken()
+    {
+        // O caso que motivou a posse de nome. A réplica que a Ana usava morreu
+        // de repente e o registro dela continua lá por alguns segundos. A
+        // reconexão automática chega aqui com o MESMO identificador de aba, e
+        // não pode ser recusada: aquele registro é dela própria. Antes disso,
+        // matar uma réplica expulsava de vez quem estava nela.
+        var presence = new Mock<IRoomPresenceService>();
+        presence.Setup(p => p.AddUserAsync(It.IsAny<string>(), It.IsAny<string>()))
+            .ReturnsAsync(new List<string> { "Ana" });
+        presence.Setup(p => p.GetUsersAsync(It.IsAny<string>()))
+            .ReturnsAsync(new List<string>());
+
+        // A reserva devolve true porque o nome já era deste mesmo cliente.
+        var names = new Mock<INameOwnershipService>();
+        names.Setup(n => n.TryClaimAsync("Geral", "Ana", It.IsAny<string>())).ReturnsAsync(true);
+
+        var groups = new Mock<IGroupManager>();
+        var callerProxy = new Mock<ISingleClientProxy>();
+        var clients = new Mock<IHubCallerClients>();
+        clients.Setup(c => c.Caller).Returns(callerProxy.Object);
+        clients.Setup(c => c.OthersInGroup(It.IsAny<string>())).Returns(Mock.Of<IClientProxy>());
+
+        var context = new FakeHubCallerContext("conn-nova", "Ana");
+        var hub = new ChatHub(Mock.Of<ILogger<ChatHub>>(), BuildConfig(), presence.Object, AllReplicasAlive(), Mock.Of<IMessageHistoryService>(), names.Object)
+        {
+            Groups = groups.Object,
+            Clients = clients.Object,
+            Context = context
+        };
+
+        await hub.OnConnectedAsync();
+
+        Assert.True(context.Items.ContainsKey("Joined"));
+        callerProxy.Verify(
+            c => c.SendCoreAsync("JoinRejected", It.IsAny<object[]>(), It.IsAny<CancellationToken>()),
+            Times.Never());
+        groups.Verify(g => g.AddToGroupAsync("conn-nova", "Geral", It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task OnConnectedAsync_SendsRecentHistoryToTheCaller()
+    {
+        var presence = new Mock<IRoomPresenceService>();
+        presence.Setup(p => p.AddUserAsync(It.IsAny<string>(), It.IsAny<string>()))
+            .ReturnsAsync(new List<string> { "Ana" });
+        presence.Setup(p => p.GetUsersAsync(It.IsAny<string>()))
+            .ReturnsAsync(new List<string>());
+
+        var history = new Mock<IMessageHistoryService>();
+        history.Setup(h => h.GetRecentAsync("Geral")).ReturnsAsync(new List<StoredMessage>
+        {
+            new("Bob", "oi", "Servidor B", "2026-01-01T00:00:00.000Z")
+        });
+
+        var callerProxy = new Mock<ISingleClientProxy>();
+        var clients = new Mock<IHubCallerClients>();
+        clients.Setup(c => c.Caller).Returns(callerProxy.Object);
+        clients.Setup(c => c.OthersInGroup(It.IsAny<string>())).Returns(Mock.Of<IClientProxy>());
+
+        var hub = new ChatHub(Mock.Of<ILogger<ChatHub>>(), BuildConfig(), presence.Object, AllReplicasAlive(), history.Object, FreeNames())
+        {
+            Groups = Mock.Of<IGroupManager>(),
+            Clients = clients.Object,
+            Context = new FakeHubCallerContext("conn-1", "Ana")
+        };
+
+        await hub.OnConnectedAsync();
+
+        callerProxy.Verify(
+            c => c.SendCoreAsync(
+                "RoomHistory",
+                It.Is<object[]>(a => ((IReadOnlyList<StoredMessage>)a[0]!).Single().Message == "oi"),
+                It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task SendMessage_StoresTheMessageInTheHistory()
+    {
+        var history = new Mock<IMessageHistoryService>();
+        var clients = new Mock<IHubCallerClients>();
+        clients.Setup(c => c.Group(It.IsAny<string>())).Returns(Mock.Of<IClientProxy>());
+
+        var presence = new Mock<IRoomPresenceService>();
+        presence.Setup(p => p.GetUsersAsync(It.IsAny<string>()))
+            .ReturnsAsync(new List<string>());
+
+        var hub = new ChatHub(Mock.Of<ILogger<ChatHub>>(), BuildConfig(), presence.Object, AllReplicasAlive(), history.Object, FreeNames())
+        {
+            Clients = clients.Object,
+            Context = new FakeHubCallerContext("conn-1", "Ana")
+        };
+
+        await hub.SendMessage("bom dia");
+
+        history.Verify(
+            h => h.AddAsync("Geral", It.Is<StoredMessage>(m =>
+                m.UserName == "Ana" && m.Message == "bom dia" && m.Replica == "test-replica")),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task SendPrivateMessage_DoesNotStoreAnythingInTheHistory()
+    {
+        // Conversa privada fica de fora do histórico de propósito: guardar
+        // conteúdo endereçado a uma pessoa específica é outra decisão, com
+        // outras implicações, e o projeto trata mensagem privada como anônima
+        // até no visualizador.
+        var history = new Mock<IMessageHistoryService>();
+        var clients = new Mock<IHubCallerClients>();
+        clients.Setup(c => c.User(It.IsAny<string>())).Returns(Mock.Of<ISingleClientProxy>());
+        clients.Setup(c => c.Group(It.IsAny<string>())).Returns(Mock.Of<IClientProxy>());
+
+        var presence = new Mock<IRoomPresenceService>();
+        presence.Setup(p => p.GetUsersAsync(It.IsAny<string>()))
+            .ReturnsAsync(new List<string>());
+
+        var hub = new ChatHub(Mock.Of<ILogger<ChatHub>>(), BuildConfig(), presence.Object, AllReplicasAlive(), history.Object, FreeNames())
+        {
+            Clients = clients.Object,
+            Context = new FakeHubCallerContext("conn-1", "Ana")
+        };
+
+        await hub.SendPrivateMessage("Bob", "segredo");
+
+        history.Verify(
+            h => h.AddAsync(It.IsAny<string>(), It.IsAny<StoredMessage>()),
+            Times.Never());
+    }
+
+    // Por padrão o nome pedido está livre. Quem testa a recusa monta o próprio
+    // mock devolvendo false.
+    private static INameOwnershipService FreeNames()
+    {
+        var names = new Mock<INameOwnershipService>();
+        names.Setup(n => n.TryClaimAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>()))
+            .ReturnsAsync(true);
+        return names.Object;
+    }
+
+    // Por padrão os testes rodam com todas as réplicas vivas, que é o estado
+    // normal. Quem precisa simular uma réplica caída monta o próprio mock.
+    private static IReplicaRegistry AllReplicasAlive()
+    {
+        var registry = new Mock<IReplicaRegistry>();
+        registry.Setup(r => r.GetAliveAsync(It.IsAny<IEnumerable<string>>()))
+            .ReturnsAsync((IEnumerable<string> nomes) => nomes.ToList());
+        return registry.Object;
     }
 
     private static IConfiguration BuildConfig() =>
