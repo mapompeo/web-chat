@@ -292,7 +292,13 @@ body {
   text-align: left;
   padding: 0.5rem 0.6rem;
   border: none;
-  border-radius: 8px;
+  /* Pilula, acompanhando os outros controles. Funciona bem aqui porque o
+     avatar redondo de 34px fica encostado na borda esquerda: o raio da linha
+     segue a curva do avatar em vez de brigar com ela. Note que isto vale pros
+     itens de conversa, que sao controles; os nos do visualizador continuam
+     com canto suave de proposito, porque la a caixa retangular e o que faz o
+     desenho ser lido como um diagrama de componentes. */
+  border-radius: 999px;
   background: transparent;
   color: var(--text);
   font-family: inherit;

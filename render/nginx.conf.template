@@ -1,0 +1,71 @@
+# Versão de produção do nginx.conf, usada só no deploy do Render.
+#
+# A diferença para nginx/nginx.conf, que roda no docker-compose, é onde as
+# réplicas moram: aqui elas são processos vizinhos em 127.0.0.1, não containers
+# com nome próprio na rede do Compose. O resto da lógica é a mesma, de
+# propósito, para o que se vê publicado ser o mesmo que se vê rodando local.
+#
+# O ${PORT} é preenchido por envsubst no start.sh, porque o nginx não expande
+# variável de ambiente no arquivo de configuração e o Render escolhe a porta.
+
+events {}
+
+http {
+    include /etc/nginx/mime.types;
+    default_type application/octet-stream;
+
+    # Sem isso o nginx não sobe como processo em primeiro plano num container
+    # sem systemd, e os logs não chegam no painel do Render.
+    access_log /dev/stdout;
+    error_log /dev/stderr;
+
+    upstream chat_backend {
+        # least_conn (nao round-robin puro): manda cada conexao nova pro
+        # servidor que tem MENOS conexoes ativas agora. Pra conexao curta
+        # (HTTP normal) round-robin ja e bom o suficiente, mas WebSocket fica
+        # aberto por muito tempo (as vezes horas) - sem isso, quem desconecta
+        # de um servidor nao "libera vaga" nenhuma pro rodizio, e o
+        # desequilibrio so cresce com o tempo. Continua sem sticky session:
+        # a escolha e por contagem de conexao, nao por quem e o cliente.
+        least_conn;
+        server 127.0.0.1:8081;
+        server 127.0.0.1:8082;
+        server 127.0.0.1:8083;
+    }
+
+    server {
+        listen ${PORT};
+        root /usr/share/nginx/html;
+        index index.html;
+
+        location /chatHub {
+            proxy_pass http://chat_backend;
+            proxy_http_version 1.1;
+            proxy_set_header Upgrade $http_upgrade;
+            proxy_set_header Connection "upgrade";
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+
+            # Uma conexao de chat fica ociosa por longos periodos entre uma
+            # mensagem e outra. Com o padrao de 60s o nginx derrubaria o
+            # WebSocket no meio da conversa, e o cliente ficaria reconectando
+            # sem parar.
+            proxy_read_timeout 3600s;
+            proxy_send_timeout 3600s;
+        }
+
+        # O navegador pede /favicon.ico sozinho, mesmo com o <link> do HTML
+        # apontando pro SVG. Sem esta regra o pedido caia no try_files de
+        # baixo e recebia o index.html com status 200: o navegador guardava
+        # uma resposta "bem-sucedida" que nao e imagem nenhuma e seguia
+        # exibindo o icone velho que tinha em cache. 404 e a resposta honesta
+        # e faz ele usar o icone declarado no HTML.
+        location = /favicon.ico {
+            return 404;
+        }
+
+        location / {
+            try_files $uri $uri/ /index.html;
+        }
+    }
+}

@@ -1,0 +1,57 @@
+# Imagem de deploy para o Render, que empacota o stack inteiro num container
+# só: Nginx (load balancer e servidor do frontend), as três réplicas do backend
+# e o Redis.
+#
+# Por que tudo junto, se o docker-compose separa em cinco containers? O plano
+# gratuito do Render não deixa um web service RECEBER tráfego pela rede
+# privada, e Private Services só existem nos planos pagos. Com serviços
+# separados, o Nginx teria que alcançar cada réplica pela URL pública, jogando
+# toda mensagem de WebSocket para fora e de volta pela internet. Além disso a
+# cota é de 750 horas de instância por mês no workspace inteiro, o que dá para
+# manter uma instância ligada o tempo todo, não quatro.
+#
+# O que se perde: as réplicas deixam de estar em máquinas diferentes. O que se
+# mantém, que é o que o projeto demonstra: continuam sendo três processos
+# independentes, cada um com seu próprio estado em memória, conversando por um
+# backplane Redis de verdade, atrás de um balanceador de verdade. É a mesma
+# topologia que o docker-compose monta na máquina de quem desenvolve.
+
+FROM node:22-alpine AS frontend
+WORKDIR /app
+COPY frontend/package*.json ./
+RUN npm ci
+COPY frontend/ ./
+RUN npm run build
+
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS backend
+WORKDIR /src
+COPY backend/ChatServer/ChatServer.csproj .
+RUN dotnet restore
+COPY backend/ChatServer/ .
+RUN dotnet publish -c Release -o /app
+
+FROM mcr.microsoft.com/dotnet/aspnet:10.0
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends nginx redis-server gettext-base \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY --from=backend /app /app/backend
+COPY --from=frontend /app/dist/frontend/browser /usr/share/nginx/html
+COPY render/nginx.conf.template /etc/nginx/nginx.conf.template
+COPY render/start.sh /start.sh
+RUN chmod +x /start.sh
+
+# GC de estação de trabalho em vez de servidor: o GC de servidor cria um heap
+# e uma thread por núcleo e reserva memória de forma agressiva, o que não cabe
+# em três processos dividindo os 512MB e a fração de CPU de uma instância
+# gratuita. Aqui cada réplica atende poucas conexões, então o modo econômico é
+# o certo.
+ENV DOTNET_gcServer=0 \
+    DOTNET_GCConserveMemory=9 \
+    ASPNETCORE_ENVIRONMENT=Production
+
+# O Render publica a porta que estiver em PORT e usa 10000 como padrão.
+ENV PORT=10000
+EXPOSE 10000
+
+CMD ["/start.sh"]

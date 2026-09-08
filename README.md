@@ -52,8 +52,10 @@ para o tema claro. A escolha fica salva em `localStorage` e persiste entre recar
 - Backend: ASP.NET Core + SignalR (.NET 10)
 - Sincronização entre réplicas: Redis (backplane do SignalR + armazenamento de presença,
   com TTL de 4h nas chaves de presença, ver limitações abaixo)
-- Frontend: Angular + PrimeNG (tema Aura, dark-first)
-- Load balancer / gateway: Nginx
+- Frontend: Angular (escuro por padrão), sem biblioteca de componentes: botão, campo de
+  texto e ícones são escritos no próprio projeto, usando as mesmas variáveis de tema
+- Avatares: DiceBear, gerados no navegador a partir do nome, sem chamada de rede
+- Load balancer / gateway: Nginx, com `least_conn`
 - Orquestração: Docker Compose (3 réplicas nomeadas do backend: `backend1`, `backend2`, `backend3`)
 
 ## Limitações conhecidas (fora de escopo deliberado)
@@ -62,19 +64,45 @@ para o tema claro. A escolha fica salva em `localStorage` e persiste entre recar
   limpa as conversas visíveis (Geral e privadas), embora a conexão em si se recupere sozinha
   (ver próximo ponto). Duas pessoas com o mesmo nome colidem, já que "nome de usuário" é só
   um texto digitado, sem senha.
-- Se uma réplica cair, a reconexão automática do SignalR reconecta o cliente (possivelmente
-  em outra réplica) e a Sala Geral é reentrada sozinha, porque `OnConnectedAsync` sempre
-  adiciona a conexão à Sala Geral, em toda conexão nova, inclusive reconexões. Validado na
-  prática: ao recarregar uma aba em Chrome, o backend registra a saída da conexão antiga e a
-  entrada da nova (em outra réplica) e o usuário volta a aparecer sozinho na lista de online,
-  sem duplicidade. A única coisa que se perde no reload é o estado local de UI (histórico de
-  mensagens exibido), não a participação na sala.
+- Ao recarregar a aba (F5), a reconexão funciona: o backend registra a saída da conexão
+  antiga e a entrada da nova (possivelmente em outra réplica), e a Sala Geral é reentrada
+  sozinha, porque `OnConnectedAsync` sempre adiciona a conexão à Sala Geral, em toda conexão
+  nova. Só se perde o estado local de interface (histórico exibido), não a participação.
+- **A queda de uma réplica, porém, hoje expulsa quem estava nela.** Quando o processo morre
+  de repente, ele não roda `OnDisconnectedAsync`, então a presença daquela pessoa fica órfã
+  no Redis. A reconexão automática cai em outra réplica, a checagem de nome único encontra o
+  registro órfão e recusa a entrada com "esse nome já está em uso", e o cliente encerra a
+  conexão. Ou seja, derrubar uma réplica não produz failover; produz expulsão. A correção
+  seria trocar a pergunta "esse nome existe na presença?" por "esse nome está numa réplica
+  que ainda está viva?", com um heartbeat curto por réplica no Redis. Está mapeado e ainda
+  não foi feito.
 - Mensagem privada mandada pra alguém que caiu da conexão bem na hora do envio simplesmente
   não chega: não há fila, retry, nem notificação de falha pro remetente.
 - A presença (lista de "quem está online") usa uma chave Redis com TTL de 4h como rede de
   segurança, não um heartbeat de verdade; se o processo do backend morrer sem rodar
   `OnDisconnectedAsync`, o usuário some da lista só quando o TTL expirar, não instantaneamente.
-- Rodado apenas localmente; sem deploy em nuvem.
+  Um efeito colateral disso vale conhecer ao olhar o visualizador: ele desenha a presença
+  registrada no Redis, enquanto o `least_conn` do Nginx decide pelas conexões TCP que ele
+  mantém abertas. São contagens diferentes, e conforme fantasmas se acumulam elas divergem,
+  fazendo o balanceador parecer errado quando está certo. `docker compose restart` limpa.
+
+## Deploy
+
+O `render.yaml` na raiz descreve um deploy no plano gratuito do Render: no painel, em
+Blueprints, aponte para este repositório e o serviço é criado sem mais configuração.
+
+É um único web service, e não cinco, porque no plano gratuito um web service pode fazer
+requisições na rede privada mas **não pode recebê-las** (e Private Services são pagos), então
+o Nginx não teria como alcançar as réplicas por dentro; e porque a cota é de 750 horas de
+instância por mês no workspace inteiro, o que mantém uma instância ligada o tempo todo, não
+cinco. O `Dockerfile.render` empacota Nginx, as três réplicas e o Redis no mesmo container,
+e o `render/start.sh` sobe as peças na ordem e derruba tudo se qualquer uma morrer.
+
+As réplicas deixam de estar em máquinas separadas, mas continuam sendo três processos
+independentes, cada um com seu estado em memória, conversando por um backplane Redis real
+atrás de um balanceador real: a mesma topologia que o `docker-compose.yml` monta localmente.
+Medido rodando a imagem com os limites do plano gratuito (512MB): 94MB em uso com três
+pessoas conectadas, e as conexões distribuídas uma em cada réplica.
 
 ## Trabalho futuro
 

@@ -1,0 +1,23 @@
+# Blueprint do Render. Com este arquivo no repositório, o deploy é criado pelo
+# painel em Blueprints > New Blueprint Instance, apontando para o repositório,
+# sem configurar nada na mão.
+#
+# É um serviço só, e não quatro, porque no plano gratuito um web service não
+# pode RECEBER tráfego pela rede privada (e Private Services são pagos), então
+# o Nginx não teria como alcançar as réplicas por dentro. A explicação completa
+# está no cabeçalho do Dockerfile.render.
+services:
+  - type: web
+    name: web-chat
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile.render
+    # O contexto é a raiz porque a imagem constrói o frontend e o backend, que
+    # moram em pastas irmãs.
+    dockerContext: .
+    healthCheckPath: /
+    envVars:
+      # O start.sh gera a configuração do Nginx com esta porta. 10000 é o valor
+      # que o Render usa por padrão.
+      - key: PORT
+        value: 10000
