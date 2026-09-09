@@ -120,7 +120,7 @@ const HOP_MS = 500;
 })
 export class VisualizerPanelComponent {
   // Mesma lista fixa que o backend usa em ChatHub.AllReplicaNames. Ver
-  // docs/superpowers/specs/2026-09-05-visualizador-arquitetura-design.md
+  // docs/design/2026-09-05-visualizador-arquitetura-design.md
   // pela explicação de por que isso é hardcoded nos dois lados.
   readonly replicaNames = ['Servidor A', 'Servidor B', 'Servidor C'];
   readonly hopMs = HOP_MS;

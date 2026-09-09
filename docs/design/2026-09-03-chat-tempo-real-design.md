@@ -134,7 +134,7 @@ signalr-docker-chat/
 ├── frontend/                 # Angular + PrimeNG
 │   ├── Dockerfile
 │   └── ...
-└── docs/superpowers/specs/   # este documento e futuros
+└── docs/design/   # este documento e futuros
 ```
 
 ## Testes / validação
