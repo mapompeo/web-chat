@@ -397,6 +397,8 @@ body {
   display: flex;
   flex-direction: column;
   min-width: 0;
+  /* Mesmo motivo do min-height na lista de mensagens logo abaixo. */
+  min-height: 0;
   padding: 1.25rem 1.5rem;
 }
 
@@ -469,6 +471,10 @@ body {
 
 .message-list {
   flex: 1;
+  /* Item flex nasce com min-height: auto, o que o impede de encolher abaixo do
+     proprio conteudo. Sem esta linha, uma conversa longa faz a lista crescer em
+     vez de rolar por dentro, empurrando a barra de digitar pra fora da tela. */
+  min-height: 0;
   overflow-y: auto;
   list-style: none;
   margin: 0;
@@ -476,6 +482,17 @@ body {
   display: flex;
   flex-direction: column;
   gap: 0.6rem;
+
+  /* Barra de rolagem escondida: ela ocupava 15px de largura visivel e ficava
+     aparecendo e sumindo conforme a conversa crescia. A rolagem em si continua
+     funcionando por roda, toque e teclado, e a lista se mantem colada no fim
+     sozinha (ver irParaOFim no ChatRoomComponent), entao na pratica quase nao
+     se rola aqui na mao. */
+  scrollbar-width: none;
+
+  &::-webkit-scrollbar {
+    display: none;
+  }
 }
 
 .message-row {
@@ -513,7 +530,8 @@ body {
   display: flex;
   align-items: center;
   gap: 0.3rem;
-  margin-bottom: 0.25rem;
+  margin-bottom: 0.2rem;
+  padding: 0 0.35rem;
   font-size: 0.72rem;
   color: var(--text-muted);
 
@@ -544,9 +562,41 @@ body {
      à pessoa e deixa óbvio, de relance, quem falou. */
   border-top-left-radius: 0.3rem;
   padding: 0.55rem 1rem;
+
+  /* O horário mora dentro do balão, e não numa linha própria acima: ocupa menos
+     altura por mensagem e é onde o olho já procura. O float faz o texto fluir
+     em volta dele, então numa mensagem curta ele fica ao lado, e numa longa
+     desce pro canto de baixo, sem nunca cobrir palavra nenhuma. */
+  .message-time {
+    float: right;
+    margin: 0.35rem 0 0 0.6rem;
+    font-size: 0.65rem;
+    line-height: 1;
+    opacity: 0.55;
+    white-space: nowrap;
+  }
   font-size: 0.95rem;
   line-height: 1.4;
   word-break: break-word;
+}
+
+/* Mensagem que continua a anterior: o espaço do avatar é preservado pra a
+   coluna de balões não desalinhar, mas fica vazio. */
+.avatar-vazio {
+  width: 28px;
+  flex-shrink: 0;
+}
+
+.message-row.seguida {
+  margin-top: -0.35rem;
+
+  .message-bubble {
+    border-top-left-radius: 1.25rem;
+  }
+
+  &.mine .message-bubble {
+    border-top-right-radius: 1.25rem;
+  }
 }
 
 .message-row.mine .message-bubble {

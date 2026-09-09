@@ -1,4 +1,4 @@
-import { Component, OnInit, ViewChild, ElementRef, effect, signal } from '@angular/core';
+import { Component, OnInit, AfterViewInit, ViewChild, ElementRef, effect, signal } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { ChatMessage, ChatService } from '../../services/chat.service';
@@ -153,16 +153,27 @@ import { IconComponent } from '../../components/icon/icon.component';
               <span>Nenhuma mensagem ainda. Diga alguma coisa!</span>
             </li>
           }
-          @for (msg of currentMessages(); track $index) {
-            <li class="message-row" [class.mine]="msg.userName === chatService.currentUserName()">
-              <img class="avatar" [src]="avatar.getAvatar(msg.userName)" alt="" />
+          @for (msg of currentMessages(); track $index; let i = $index) {
+            <li
+              class="message-row"
+              [class.mine]="msg.userName === chatService.currentUserName()"
+              [class.seguida]="ehSequencia(i)"
+            >
+              @if (ehSequencia(i)) {
+                <span class="avatar-vazio" aria-hidden="true"></span>
+              } @else {
+                <img class="avatar" [src]="avatar.getAvatar(msg.userName)" alt="" />
+              }
               <div class="message-col">
-                <div class="message-info">
-                  <strong>{{ msg.userName }}</strong>
-                  <span class="dot">·</span>
-                  <span class="timestamp">{{ formatTime(msg.timestamp) }}</span>
-                </div>
-                <p class="message-bubble">{{ msg.message }}</p>
+                @if (!ehSequencia(i)) {
+                  <div class="message-info">
+                    <strong>{{ msg.userName }}</strong>
+                  </div>
+                }
+                <p class="message-bubble">
+                  {{ msg.message }}
+                  <span class="message-time">{{ formatTime(msg.timestamp) }}</span>
+                </p>
               </div>
             </li>
           }
@@ -197,7 +208,7 @@ import { IconComponent } from '../../components/icon/icon.component';
     </div>
   `
 })
-export class ChatRoomComponent implements OnInit {
+export class ChatRoomComponent implements OnInit, AfterViewInit {
   userName = '';
   draft = '';
   activeView: 'geral' | string = 'geral';
@@ -215,6 +226,7 @@ export class ChatRoomComponent implements OnInit {
   readonly sidebarWidth = signal(240);
   readonly visualizerWidth = signal(500);
   private resizing: 'sidebar' | 'visualizer' | null = null;
+  private coladoNoFim = true;
 
   @ViewChild('messageListEl') messageListEl!: ElementRef<HTMLElement>;
 
@@ -225,19 +237,14 @@ export class ChatRoomComponent implements OnInit {
     public theme: ThemeService,
     public avatar: AvatarService
   ) {
-    // Rola a lista de mensagens pro final sempre que uma nova mensagem chegar
-    // (na sala atual ou numa conversa privada); sem isso, mensagens novas
-    // ficam escondidas abaixo da área visível assim que a lista cresce demais.
-    // O setTimeout(0) empurra a rolagem pro próximo tick, depois que o Angular
-    // já atualizou o DOM com o novo <li>.
+    // Mantém a lista colada no fim quando chega mensagem nova. Só rola se a
+    // pessoa já estava no fim: se ela subiu pra reler algo, ser jogada pra
+    // baixo no meio da leitura seria pior do que perder o aviso.
     effect(() => {
       this.currentMessages();
-      setTimeout(() => {
-        const el = this.messageListEl?.nativeElement;
-        if (el) {
-          el.scrollTop = el.scrollHeight;
-        }
-      }, 0);
+      if (this.coladoNoFim) {
+        this.irParaOFim();
+      }
     });
 
     // Se a conversa que acabou de receber mensagem nova já é a que está aberta na
@@ -248,6 +255,44 @@ export class ChatRoomComponent implements OnInit {
       if (this.activeView !== 'geral' && unread.has(this.activeView)) {
         this.chatService.markPrivateRead(this.activeView);
       }
+    });
+  }
+
+  ngAfterViewInit(): void {
+    const el = this.messageListEl?.nativeElement;
+    if (!el) return;
+
+    // Guarda se a pessoa está no fim da conversa. A margem existe porque
+    // rolagem por toque raramente para no pixel exato do fim.
+    el.addEventListener('scroll', () => {
+      this.coladoNoFim = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+    });
+
+    // Reagir só a mensagem nova não basta: a altura útil da lista muda sozinha
+    // em várias situações, e em todas elas o conteúdo escapava pra fora da área
+    // visível e exigia rolar na mão. A mais comum é o teclado do celular
+    // abrindo, que encolhe a janela; abrir ou fechar o visualizador e girar o
+    // aparelho têm o mesmo efeito. Observar o tamanho da própria lista cobre
+    // todos esses casos de uma vez.
+    new ResizeObserver(() => {
+      if (this.coladoNoFim) {
+        this.irParaOFim();
+      }
+    }).observe(el);
+  }
+
+  // Dois quadros de espera de propósito: o primeiro deixa o Angular escrever o
+  // novo <li> no DOM, e o segundo deixa o navegador refazer o layout com ele.
+  // Rolar antes disso usaria uma altura que ainda não inclui a mensagem que
+  // acabou de chegar, e a lista pararia um pouco antes do fim.
+  private irParaOFim(): void {
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        const el = this.messageListEl?.nativeElement;
+        if (el) {
+          el.scrollTop = el.scrollHeight;
+        }
+      });
     });
   }
 
@@ -338,6 +383,25 @@ export class ChatRoomComponent implements OnInit {
     return this.chatService.privateMessages().get(this.activeView) ?? [];
   }
 
+  // Mensagem que continua a anterior: mesma pessoa e pouco tempo depois. Nesse
+  // caso o avatar e o nome não se repetem, e o balão sobe encostado no de cima,
+  // que é como todo aplicativo de conversa agrupa. A janela de cinco minutos
+  // existe pra separar assuntos: se a pessoa volta a falar meia hora depois,
+  // vale mostrar de novo quem é e quando foi.
+  private static readonly JANELA_SEQUENCIA_MS = 5 * 60 * 1000;
+
+  ehSequencia(indice: number): boolean {
+    if (indice === 0) return false;
+    const mensagens = this.currentMessages();
+    const atual = mensagens[indice];
+    const anterior = mensagens[indice - 1];
+    if (!atual || !anterior || atual.userName !== anterior.userName) return false;
+
+    const diferenca =
+      new Date(atual.timestamp).getTime() - new Date(anterior.timestamp).getTime();
+    return diferenca >= 0 && diferenca < ChatRoomComponent.JANELA_SEQUENCIA_MS;
+  }
+
   formatTime(timestamp: string): string {
     // O servidor manda o horário em UTC; formatamos aqui pra usar o fuso horário
     // local de quem está vendo, já que o container pode rodar em outro fuso.
@@ -353,6 +417,7 @@ export class ChatRoomComponent implements OnInit {
     const messageToSend = this.draft;
     this.draft = '';
     this.errorMessage = '';
+    this.coladoNoFim = true;
 
     try {
       if (this.activeView === 'geral') {
