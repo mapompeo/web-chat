@@ -15,11 +15,11 @@ com um painel que anima cada mensagem percorrendo o caminho real entre elas.
 [![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=white)](https://docs.docker.com/compose/)
 [![Testes](https://img.shields.io/badge/testes-19%20unidade%20%2B%209%20e2e-success)](#testes)
 
-[**Ver funcionando**](https://web-chat-u5ko.onrender.com) · [Arquitetura](#arquitetura) · [Rodar localmente](#rodando-localmente) · [Decisões técnicas](#decisões-técnicas)
+[**Ver funcionando**](https://web-chat-mapompeo.onrender.com) · [Arquitetura](#arquitetura) · [Rodar localmente](#rodando-localmente) · [Decisões técnicas](#decisões-técnicas)
 
 </div>
 
-<a href="https://web-chat-u5ko.onrender.com">
+<a href="https://web-chat-mapompeo.onrender.com">
   <img src="docs/img/chat-desktop.png" alt="Chat com três pessoas conectadas em réplicas diferentes e o visualizador de arquitetura ao lado">
 </a>
 
@@ -260,7 +260,7 @@ verifica que a pessoa migra para outra sem perder a conversa. Usa `kill` e não
 
 ## No celular
 
-<a href="https://web-chat-u5ko.onrender.com">
+<a href="https://web-chat-mapompeo.onrender.com">
   <img src="docs/img/chat-mobile.png" alt="Layout do chat no celular, com o visualizador ocupando a metade de cima da tela" width="330">
 </a>
 
