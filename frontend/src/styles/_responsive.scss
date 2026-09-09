@@ -1,0 +1,194 @@
+// Ajustes de celular. Fica por ultimo de proposito: sao sobrescritas do
+// que os arquivos anteriores definiram, e a ordem importa na cascata.
+
+/* ------------------------------------------------------------------ */
+/* Responsivo (celular)                                                 */
+/* ------------------------------------------------------------------ */
+
+.mobile-backdrop {
+  display: none;
+}
+
+.sidebar-toggle {
+  display: none;
+}
+
+@media (max-width: 900px) {
+  .mobile-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    /* Acima do visualizador (z-index 20): sem isso a sidebar e seu fundo
+       escuro empatavam com ele e perdiam por virem antes no DOM. */
+    z-index: 24;
+  }
+
+  .sidebar-toggle {
+    display: inline-flex;
+  }
+
+  /* O cabeçalho no celular já disputa espaço entre menu, título e dois
+     botões; o selo sai daqui e a informação continua no visualizador. */
+  .server-badge {
+    display: none;
+  }
+
+  /* Arrastar só existe em tela grande (os painéis viram flutuante/split-view
+     aqui, redimensionar não faria sentido); a alça some, e a largura em px
+     que o componente aplica via [style.width.px] é sobrescrita com
+     !important, senão o estilo inline (que tem prioridade normalmente)
+     ganharia da regra de media query. */
+  .resize-handle {
+    display: none;
+  }
+
+  /* No desktop a sidebar e o visualizador são colunas fixas lado a lado;
+     não cabe em tela de celular (240px + resto + 500px estoura qualquer
+     viewport de telefone). No mobile os dois viram painéis flutuantes por
+     cima do chat, escondidos por padrão e abertos só pelos botões do
+     cabeçalho. */
+  .sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    height: 100dvh;
+    width: min(280px, 80vw) !important;
+    /* Aqui a sidebar é um painel flutuante por cima do chat, não uma coluna
+       dividindo espaço com ele, então o teto de um terço da tela não vale. */
+    max-width: none;
+    z-index: 25;
+    transform: translateX(-100%);
+    transition: transform 0.25s ease;
+
+    &.mobile-open {
+      transform: translateX(0);
+    }
+  }
+
+  /* Com o visualizador aberto, ele ocupa a metade de cima da tela. A sidebar
+     desliza para a metade de BAIXO em vez da tela inteira: antes ela abria
+     por trás do visualizador, então só a faixa abaixo dele aparecia; a barra
+     estava lá, mas a lista de conversas ficava escondida atrás do painel. O
+     fundo escuro acompanha, deixando o visualizador visível e clicável em
+     cima enquanto a sidebar está aberta embaixo. */
+  .chat-container.with-visualizer {
+    .sidebar {
+      top: 50dvh;
+      height: 50dvh;
+    }
+
+    .mobile-backdrop {
+      top: 50dvh;
+    }
+  }
+
+  /* O visualizador não vira uma coluna lateral no celular (não tem espaço
+     de sobra do lado), e sim um painel fixo ocupando a metade de CIMA da
+     tela inteira, com o chat encolhendo pra metade de BAIXO enquanto ele
+     está aberto. Os dois ficam visíveis e usáveis ao mesmo tempo, diferente
+     da sidebar (que cobre e esconde o chat por baixo dela). */
+  app-visualizer-panel {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    width: 100% !important;
+    /* Ocupa a largura toda da tela aqui, então o teto de um terço não vale. */
+    max-width: none;
+    height: 50dvh;
+    z-index: 20;
+  }
+
+  /* Com três servidores lado a lado em tela de celular sobra pouquíssima
+     largura por coluna; no formato do desktop (ícone + nome + contador numa
+     linha só, com reticências) o nome era cortado exatamente na letra que
+     distingue um servidor do outro, virando "Servidor  Servidor  Servidor".
+     Aqui o cabeçalho vira coluna (nome em cima, contador embaixo), o ícone
+     sai e o texto pode quebrar em duas linhas; assim o "A"/"B"/"C" nunca
+     se perde, seja qual for a largura da tela. */
+  /* O diagrama inteiro precisa caber na metade da tela que sobra pra ele no
+     celular. Com as alturas do desktop ele estouraria e viraria uma lista
+     rolável, escondendo justamente as faixas onde a mensagem viaja, então
+     aqui tudo encolhe um pouco: menos respiro em volta, nós mais baixos e
+     faixas de conexão mais curtas (mas ainda com altura de sobra pro pulso
+     ser visível percorrendo elas). */
+  .visualizer-panel {
+    padding: 14px;
+
+    h4 {
+      margin-bottom: 10px;
+    }
+  }
+
+  .viz-node {
+    padding: 8px 12px;
+  }
+
+  .viz-connectors {
+    height: 26px;
+  }
+
+  .viz-people-row {
+    margin-top: 2px;
+  }
+
+  .viz-servers {
+    gap: 8px;
+
+    .viz-node {
+      padding: 8px 6px;
+    }
+
+    .viz-node-head {
+      justify-content: center;
+      gap: 5px;
+      font-size: 0.7rem;
+      white-space: normal;
+      text-align: center;
+
+      /* O ícone cabe de novo agora que o contador saiu da linha; só encolhe
+         junto com o texto pra sobrar largura pro nome inteiro. */
+      .viz-icon {
+        font-size: 15px;
+      }
+    }
+  }
+
+  .message-row {
+    max-width: 85%;
+  }
+
+  /* Em tela estreita o texto "Enviar" competia com o campo de mensagem pela
+     largura; o ícone sozinho já diz o que o botão faz (o aria-label cobre
+     leitores de tela). */
+  .btn-send {
+    /* Sem o rótulo e com padding igual nos quatro lados, o raio de pílula
+       fecha num círculo perfeito, do tamanho do campo ao lado. */
+    width: 2.75rem;
+    height: 2.75rem;
+    padding: 0;
+    flex-shrink: 0;
+
+    app-icon {
+      font-size: 1.2rem;
+    }
+
+    .btn-label {
+      display: none;
+    }
+  }
+
+  .conversation {
+    padding: 1rem;
+
+    &.split-view {
+      margin-top: 50dvh;
+      height: 50dvh;
+    }
+  }
+
+  .conversation-header h3 {
+    font-size: 1rem;
+  }
+}

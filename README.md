@@ -19,7 +19,11 @@ com um painel que anima cada mensagem percorrendo o caminho real entre elas.
 
 </div>
 
-![Chat com três pessoas conectadas em réplicas diferentes e o visualizador de arquitetura ao lado](docs/img/chat-desktop.png)
+<a href="https://web-chat-u5ko.onrender.com">
+  <img src="docs/img/chat-desktop.png" alt="Chat com três pessoas conectadas em réplicas diferentes e o visualizador de arquitetura ao lado">
+</a>
+
+<div align="center"><sub>Clique na imagem para abrir a aplicação</sub></div>
 
 ---
 
@@ -256,7 +260,9 @@ verifica que a pessoa migra para outra sem perder a conversa. Usa `kill` e não
 
 ## No celular
 
-<img src="docs/img/chat-mobile.png" alt="Layout do chat no celular, com o visualizador ocupando a metade de cima da tela" width="330">
+<a href="https://web-chat-u5ko.onrender.com">
+  <img src="docs/img/chat-mobile.png" alt="Layout do chat no celular, com o visualizador ocupando a metade de cima da tela" width="330">
+</a>
 
 A lista de conversas vira gaveta e o visualizador ocupa a metade de cima da
 tela, em vez de sumir. Em tela grande, os dois painéis laterais são

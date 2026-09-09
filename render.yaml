@@ -8,7 +8,7 @@
 # está no cabeçalho do Dockerfile.render.
 services:
   - type: web
-    name: web-chat
+    name: web-chat-mapompeo
     runtime: docker
     plan: free
     dockerfilePath: ./Dockerfile.render

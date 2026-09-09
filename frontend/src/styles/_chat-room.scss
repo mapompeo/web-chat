@@ -1,0 +1,381 @@
+// Sala de chat: lista de conversas, cabecalho, mensagens e barra de envio.
+
+/* ------------------------------------------------------------------ */
+/* Chat room screen                                                     */
+/* ------------------------------------------------------------------ */
+
+.chat-container {
+  height: 100vh;
+  height: 100dvh;
+  display: flex;
+  background: var(--bg);
+  overflow-x: hidden;
+}
+
+.sidebar {
+  width: 240px;
+  /* Mesmo teto de um terço da tela do visualizador, pelo mesmo motivo. */
+  max-width: 33.3333vw;
+  flex-shrink: 0;
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  padding: 1.25rem 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+
+  h4 {
+    margin: 0 0 0.25rem;
+    padding: 0 0.5rem;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+  }
+}
+
+.conversation-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.conversation-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  text-align: left;
+  padding: 0.5rem 0.6rem;
+  border: none;
+  /* Pilula, acompanhando os outros controles. Funciona bem aqui porque o
+     avatar redondo de 34px fica encostado na borda esquerda: o raio da linha
+     segue a curva do avatar em vez de brigar com ela. Note que isto vale pros
+     itens de conversa, que sao controles; os nos do visualizador continuam
+     com canto suave de proposito, porque la a caixa retangular e o que faz o
+     desenho ser lido como um diagrama de componentes. */
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text);
+  font-family: inherit;
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: background-color 0.12s ease;
+
+  &:hover {
+    background: var(--border);
+  }
+
+  &.active {
+    background: color-mix(in srgb, var(--accent) 18%, transparent);
+    color: var(--accent);
+
+    .conv-name {
+      font-weight: 600;
+    }
+  }
+}
+
+/* O avatar da conversa e a bolinha de "online" andam juntos, então ficam num
+   wrapper posicionado; a bolinha é ancorada no canto do avatar. O mesmo
+   bloco é reaproveitado no cabeçalho da conversa aberta. */
+.conv-figure {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  flex-shrink: 0;
+}
+
+.conv-figure-room {
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  color: var(--accent);
+  font-size: 1rem;
+}
+
+.conv-avatar {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+}
+
+.conv-online-dot {
+  position: absolute;
+  right: -1px;
+  bottom: -1px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #22c55e;
+  /* A borda na cor do fundo recorta a bolinha do avatar, senão ela se mistura
+     com o desenho embaixo e vira só uma mancha verde. */
+  border: 2px solid var(--surface);
+}
+
+.conv-body {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+
+.conv-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.conv-sub {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.72rem;
+  font-weight: 400;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.unread-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--danger);
+  flex-shrink: 0;
+}
+
+.conversation {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  /* Mesmo motivo do min-height na lista de mensagens logo abaixo. */
+  min-height: 0;
+  padding: 1.25rem 1.5rem;
+}
+
+.conversation-header {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 0.75rem;
+  margin-bottom: 0.75rem;
+
+  h3 {
+    margin: 0;
+    font-size: 1.1rem;
+    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+.conversation-title {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  min-width: 0;
+  /* Empurra as ações (tema, visualizador) pra direita sem precisar de um
+     space-between que também afastaria o botão de menu do título no mobile. */
+  flex: 1;
+
+  /* No cabeçalho o avatar fica sobre o fundo da conversa, não sobre o da
+     sidebar; a borda que recorta a bolinha de online precisa acompanhar. */
+  .conv-online-dot {
+    border-color: var(--bg);
+  }
+}
+
+.conversation-title-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.conversation-subtitle {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.message-empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+
+  app-icon {
+    font-size: 2rem;
+    opacity: 0.5;
+  }
+}
+
+.message-list {
+  flex: 1;
+  /* Item flex nasce com min-height: auto, o que o impede de encolher abaixo do
+     proprio conteudo. Sem esta linha, uma conversa longa faz a lista crescer em
+     vez de rolar por dentro, empurrando a barra de digitar pra fora da tela. */
+  min-height: 0;
+  overflow-y: auto;
+  list-style: none;
+  margin: 0;
+  padding: 0.25rem 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+
+  /* Barra de rolagem escondida: ela ocupava 15px de largura visivel e ficava
+     aparecendo e sumindo conforme a conversa crescia. A rolagem em si continua
+     funcionando por roda, toque e teclado, e a lista se mantem colada no fim
+     sozinha (ver irParaOFim no ChatRoomComponent), entao na pratica quase nao
+     se rola aqui na mao. */
+  scrollbar-width: none;
+
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+.message-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  max-width: 65%;
+  align-self: flex-start;
+
+  &.mine {
+    align-self: flex-end;
+    flex-direction: row-reverse;
+  }
+}
+
+.avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: var(--bg);
+}
+
+.message-col {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.message-row.mine .message-col {
+  align-items: flex-end;
+}
+
+.message-info {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  margin-bottom: 0.2rem;
+  padding: 0 0.35rem;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+
+  strong {
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--text);
+  }
+
+  .dot {
+    opacity: 0.5;
+  }
+}
+
+.message-bubble {
+  margin: 0;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  /* Raio maior que a metade da altura de uma linha, então uma mensagem curta
+     (a maioria) sai como pílula fechada, igual ao campo de digitar e aos
+     botões. Numa mensagem de várias linhas o raio não chega à metade da
+     altura e vira um retângulo bem arredondado, que é o que se quer ali:
+     pílula de verdade num parágrafo deixaria as pontas deformadas. */
+  border-radius: 1.25rem;
+  /* O canto voltado pro avatar fica quase reto, formando o "bico" do balão.
+     Como o avatar de quem manda fica à direita e o das outras pessoas à
+     esquerda, é o canto de cima daquele lado que muda: isso amarra o balão
+     à pessoa e deixa óbvio, de relance, quem falou. */
+  border-top-left-radius: 0.3rem;
+  padding: 0.55rem 1rem;
+
+  /* O horário mora dentro do balão, e não numa linha própria acima: ocupa menos
+     altura por mensagem e é onde o olho já procura. O float faz o texto fluir
+     em volta dele, então numa mensagem curta ele fica ao lado, e numa longa
+     desce pro canto de baixo, sem nunca cobrir palavra nenhuma. */
+  .message-time {
+    float: right;
+    margin: 0.35rem 0 0 0.6rem;
+    font-size: 0.65rem;
+    line-height: 1;
+    opacity: 0.55;
+    white-space: nowrap;
+  }
+  font-size: 0.95rem;
+  line-height: 1.4;
+  word-break: break-word;
+}
+
+/* Mensagem que continua a anterior: o espaço do avatar é preservado pra a
+   coluna de balões não desalinhar, mas fica vazio. */
+.avatar-placeholder {
+  width: 28px;
+  flex-shrink: 0;
+}
+
+.message-row.follow-up {
+  margin-top: -0.35rem;
+
+  .message-bubble {
+    border-top-left-radius: 1.25rem;
+  }
+
+  &.mine .message-bubble {
+    border-top-right-radius: 1.25rem;
+  }
+}
+
+.message-row.mine .message-bubble {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+  /* Espelha o bico pro lado direito, que é onde fica o próprio avatar. */
+  border-top-left-radius: 1.25rem;
+  border-top-right-radius: 0.3rem;
+}
+
+.input-row {
+  display: flex;
+  gap: 0.6rem;
+  padding-top: 0.9rem;
+  margin-top: 0.6rem;
+  border-top: 1px solid var(--border);
+
+  .text-input {
+    flex: 1;
+    min-width: 0;
+  }
+}

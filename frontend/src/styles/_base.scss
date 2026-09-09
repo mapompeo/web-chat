@@ -1,0 +1,50 @@
+// Paleta, reset e estilos que valem pra pagina inteira.
+// A troca de tema acontece aqui: o ThemeService escreve data-theme no
+// <html>, e todo o resto do projeto consome estas variaveis.
+
+/* You can add global styles to this file, and also import other style files */
+
+:root {
+  --bg: #ffffff;
+  --surface: #f4f4f5;
+  --border: #e4e4e7;
+  --text: #18181b;
+  --text-muted: #71717a;
+  --accent: #3b6fe0;
+  --danger: #dc2626;
+}
+
+:root[data-theme='dark'] {
+  --bg: #0e0f11;
+  --surface: #17181b;
+  --border: #26272b;
+  --text: #e4e4e7;
+  --text-muted: #a1a1aa;
+  --accent: #5b8cff;
+  --danger: #f87171;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, 'Segoe UI', sans-serif;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.error-text {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: var(--danger);
+  font-size: 0.9rem;
+}
