@@ -582,12 +582,12 @@ body {
 
 /* Mensagem que continua a anterior: o espaço do avatar é preservado pra a
    coluna de balões não desalinhar, mas fica vazio. */
-.avatar-vazio {
+.avatar-placeholder {
   width: 28px;
   flex-shrink: 0;
 }
 
-.message-row.seguida {
+.message-row.follow-up {
   margin-top: -0.35rem;
 
   .message-bubble {

@@ -21,22 +21,22 @@ public class RedisReplicaRegistry : IReplicaRegistry
     // O desconto usa a CONTAGEM de cada pessoa, não 1: a mesma pessoa pode ter
     // várias abas na mesma réplica, e todas caíram juntas.
     private const string ReapScript = @"
-        local dados = redis.call('HGETALL', KEYS[1])
-        if #dados == 0 then return {} end
-        local removidos = {}
-        for i = 1, #dados, 2 do
-            local pessoa = dados[i]
-            local quantas = tonumber(dados[i + 1])
-            local restante = redis.call('HINCRBY', KEYS[2], pessoa, -quantas)
-            if restante <= 0 then
-                redis.call('HDEL', KEYS[2], pessoa)
-                redis.call('HDEL', KEYS[3], pessoa)
-                table.insert(removidos, pessoa)
+        local entries = redis.call('HGETALL', KEYS[1])
+        if #entries == 0 then return {} end
+        local removed = {}
+        for i = 1, #entries, 2 do
+            local user = entries[i]
+            local count = tonumber(entries[i + 1])
+            local remaining = redis.call('HINCRBY', KEYS[2], user, -count)
+            if remaining <= 0 then
+                redis.call('HDEL', KEYS[2], user)
+                redis.call('HDEL', KEYS[3], user)
+                table.insert(removed, user)
             end
         end
         redis.call('DEL', KEYS[1])
         redis.call('PEXPIRE', KEYS[2], ARGV[1])
-        return removidos
+        return removed
     ";
 
     private readonly IConnectionMultiplexer _redis;
@@ -55,15 +55,15 @@ public class RedisReplicaRegistry : IReplicaRegistry
     public async Task<IReadOnlyList<string>> GetAliveAsync(IEnumerable<string> replicaNames)
     {
         var db = _redis.GetDatabase();
-        var nomes = replicaNames.ToList();
-        var existe = await Task.WhenAll(nomes.Select(n => db.KeyExistsAsync(AliveKey(n))));
-        return nomes.Where((_, i) => existe[i]).ToList();
+        var names = replicaNames.ToList();
+        var alive = await Task.WhenAll(names.Select(n => db.KeyExistsAsync(AliveKey(n))));
+        return names.Where((_, i) => alive[i]).ToList();
     }
 
     public async Task<IReadOnlyList<string>> ReapAsync(string deadReplicaName, string roomName)
     {
         var db = _redis.GetDatabase();
-        var resultado = await db.ScriptEvaluateAsync(
+        var result = await db.ScriptEvaluateAsync(
             ReapScript,
             new RedisKey[]
             {
@@ -73,12 +73,12 @@ public class RedisReplicaRegistry : IReplicaRegistry
             },
             new RedisValue[] { (long)TimeSpan.FromHours(4).TotalMilliseconds });
 
-        if (resultado.IsNull)
+        if (result.IsNull)
         {
             return Array.Empty<string>();
         }
 
-        return ((RedisValue[])resultado!).Select(v => v.ToString()).ToList();
+        return ((RedisValue[])result!).Select(v => v.ToString()).ToList();
     }
 
     private static string AliveKey(string replicaName) => $"replica:{replicaName}:alive";

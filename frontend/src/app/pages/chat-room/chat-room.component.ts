@@ -157,15 +157,15 @@ import { IconComponent } from '../../components/icon/icon.component';
             <li
               class="message-row"
               [class.mine]="msg.userName === chatService.currentUserName()"
-              [class.seguida]="ehSequencia(i)"
+              [class.follow-up]="isFollowUp(i)"
             >
-              @if (ehSequencia(i)) {
-                <span class="avatar-vazio" aria-hidden="true"></span>
+              @if (isFollowUp(i)) {
+                <span class="avatar-placeholder" aria-hidden="true"></span>
               } @else {
                 <img class="avatar" [src]="avatar.getAvatar(msg.userName)" alt="" />
               }
               <div class="message-col">
-                @if (!ehSequencia(i)) {
+                @if (!isFollowUp(i)) {
                   <div class="message-info">
                     <strong>{{ msg.userName }}</strong>
                   </div>
@@ -226,7 +226,7 @@ export class ChatRoomComponent implements OnInit, AfterViewInit {
   readonly sidebarWidth = signal(240);
   readonly visualizerWidth = signal(500);
   private resizing: 'sidebar' | 'visualizer' | null = null;
-  private coladoNoFim = true;
+  private isAtBottom = true;
 
   @ViewChild('messageListEl') messageListEl!: ElementRef<HTMLElement>;
 
@@ -242,8 +242,8 @@ export class ChatRoomComponent implements OnInit, AfterViewInit {
     // baixo no meio da leitura seria pior do que perder o aviso.
     effect(() => {
       this.currentMessages();
-      if (this.coladoNoFim) {
-        this.irParaOFim();
+      if (this.isAtBottom) {
+        this.scrollToBottom();
       }
     });
 
@@ -265,7 +265,7 @@ export class ChatRoomComponent implements OnInit, AfterViewInit {
     // Guarda se a pessoa está no fim da conversa. A margem existe porque
     // rolagem por toque raramente para no pixel exato do fim.
     el.addEventListener('scroll', () => {
-      this.coladoNoFim = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+      this.isAtBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
     });
 
     // Reagir só a mensagem nova não basta: a altura útil da lista muda sozinha
@@ -275,8 +275,8 @@ export class ChatRoomComponent implements OnInit, AfterViewInit {
     // aparelho têm o mesmo efeito. Observar o tamanho da própria lista cobre
     // todos esses casos de uma vez.
     new ResizeObserver(() => {
-      if (this.coladoNoFim) {
-        this.irParaOFim();
+      if (this.isAtBottom) {
+        this.scrollToBottom();
       }
     }).observe(el);
   }
@@ -285,7 +285,7 @@ export class ChatRoomComponent implements OnInit, AfterViewInit {
   // novo <li> no DOM, e o segundo deixa o navegador refazer o layout com ele.
   // Rolar antes disso usaria uma altura que ainda não inclui a mensagem que
   // acabou de chegar, e a lista pararia um pouco antes do fim.
-  private irParaOFim(): void {
+  private scrollToBottom(): void {
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
         const el = this.messageListEl?.nativeElement;
@@ -388,18 +388,18 @@ export class ChatRoomComponent implements OnInit, AfterViewInit {
   // que é como todo aplicativo de conversa agrupa. A janela de cinco minutos
   // existe pra separar assuntos: se a pessoa volta a falar meia hora depois,
   // vale mostrar de novo quem é e quando foi.
-  private static readonly JANELA_SEQUENCIA_MS = 5 * 60 * 1000;
+  private static readonly FOLLOW_UP_WINDOW_MS = 5 * 60 * 1000;
 
-  ehSequencia(indice: number): boolean {
-    if (indice === 0) return false;
-    const mensagens = this.currentMessages();
-    const atual = mensagens[indice];
-    const anterior = mensagens[indice - 1];
-    if (!atual || !anterior || atual.userName !== anterior.userName) return false;
+  isFollowUp(index: number): boolean {
+    if (index === 0) return false;
+    const messages = this.currentMessages();
+    const current = messages[index];
+    const previous = messages[index - 1];
+    if (!current || !previous || current.userName !== previous.userName) return false;
 
-    const diferenca =
-      new Date(atual.timestamp).getTime() - new Date(anterior.timestamp).getTime();
-    return diferenca >= 0 && diferenca < ChatRoomComponent.JANELA_SEQUENCIA_MS;
+    const elapsed =
+      new Date(current.timestamp).getTime() - new Date(previous.timestamp).getTime();
+    return elapsed >= 0 && elapsed < ChatRoomComponent.FOLLOW_UP_WINDOW_MS;
   }
 
   formatTime(timestamp: string): string {
@@ -417,7 +417,7 @@ export class ChatRoomComponent implements OnInit, AfterViewInit {
     const messageToSend = this.draft;
     this.draft = '';
     this.errorMessage = '';
-    this.coladoNoFim = true;
+    this.isAtBottom = true;
 
     try {
       if (this.activeView === 'geral') {

@@ -49,11 +49,11 @@ public class RedisMessageHistoryService : IMessageHistoryService
     public async Task<IReadOnlyList<StoredMessage>> GetRecentAsync(string roomName)
     {
         var db = _redis.GetDatabase();
-        var itens = await db.ListRangeAsync(HistoryKey(roomName));
+        var items = await db.ListRangeAsync(HistoryKey(roomName));
 
         // LPUSH coloca no início, então a lista sai da mais nova pra mais
         // antiga; a tela precisa do contrário.
-        return itens
+        return items
             .Reverse()
             .Select(i => JsonSerializer.Deserialize<StoredMessage>(i.ToString()))
             .Where(m => m is not null)

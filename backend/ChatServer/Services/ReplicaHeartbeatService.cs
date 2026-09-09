@@ -70,28 +70,28 @@ public class ReplicaHeartbeatService : BackgroundService
     {
         try
         {
-            var vivas = await _registry.GetAliveAsync(ChatHub.AllReplicaNames);
-            foreach (var morta in ChatHub.AllReplicaNames.Except(vivas))
+            var alive = await _registry.GetAliveAsync(ChatHub.AllReplicaNames);
+            foreach (var dead in ChatHub.AllReplicaNames.Except(alive))
             {
-                var removidos = await _registry.ReapAsync(morta, ChatHub.GeralRoom);
-                if (removidos.Count == 0)
+                var removed = await _registry.ReapAsync(dead, ChatHub.GeralRoom);
+                if (removed.Count == 0)
                 {
                     continue;
                 }
 
                 _logger.LogInformation(
                     "[{Replica}] {Morta} parou de responder; removendo {Total} presença(s) órfã(s): {Pessoas}",
-                    _replicaName, morta, removidos.Count, string.Join(", ", removidos));
+                    _replicaName, dead, removed.Count, string.Join(", ", removed));
 
-                foreach (var pessoa in removidos)
+                foreach (var user in removed)
                 {
                     // Os mesmos eventos que OnDisconnectedAsync mandaria se a
                     // réplica tivesse saído de forma limpa, pra lista de online
                     // e visualizador voltarem ao normal sem ninguém precisar
                     // recarregar a página.
-                    await _hub.Clients.Group(ChatHub.GeralRoom).SendAsync("UserLeft", pessoa, morta);
+                    await _hub.Clients.Group(ChatHub.GeralRoom).SendAsync("UserLeft", user, dead);
                     await _hub.Clients.Group(ChatHub.VisualizerGroup)
-                        .SendAsync("VisualizerUserDisconnected", morta, pessoa);
+                        .SendAsync("VisualizerUserDisconnected", dead, user);
                 }
             }
         }

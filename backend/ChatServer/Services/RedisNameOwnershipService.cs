@@ -10,8 +10,8 @@ public class RedisNameOwnershipService : INameOwnershipService
     // comandos separados, duas pessoas pedindo o mesmo nome livre ao mesmo
     // tempo poderiam ambas ler "livre" e ambas gravar, e as duas entrariam.
     private const string ClaimScript = @"
-        local dono = redis.call('HGET', KEYS[1], ARGV[1])
-        if dono and dono ~= ARGV[2] then
+        local owner = redis.call('HGET', KEYS[1], ARGV[1])
+        if owner and owner ~= ARGV[2] then
             return 0
         end
         redis.call('HSET', KEYS[1], ARGV[1], ARGV[2])
@@ -20,8 +20,8 @@ public class RedisNameOwnershipService : INameOwnershipService
     ";
 
     private const string ReleaseScript = @"
-        local dono = redis.call('HGET', KEYS[1], ARGV[1])
-        if dono == ARGV[2] then
+        local owner = redis.call('HGET', KEYS[1], ARGV[1])
+        if owner == ARGV[2] then
             redis.call('HDEL', KEYS[1], ARGV[1])
         end
         return redis.status_reply('OK')
@@ -37,11 +37,11 @@ public class RedisNameOwnershipService : INameOwnershipService
     public async Task<bool> TryClaimAsync(string roomName, string userName, string clientId)
     {
         var db = _redis.GetDatabase();
-        var resultado = await db.ScriptEvaluateAsync(
+        var result = await db.ScriptEvaluateAsync(
             ClaimScript,
             new RedisKey[] { OwnersKey(roomName) },
             new RedisValue[] { userName, clientId, (long)OwnerTtl.TotalMilliseconds });
-        return (int)resultado == 1;
+        return (int)result == 1;
     }
 
     public async Task ReleaseAsync(string roomName, string userName, string clientId)

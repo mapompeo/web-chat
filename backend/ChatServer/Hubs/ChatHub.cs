@@ -44,50 +44,21 @@ public class ChatHub : Hub
         var userName = Context.UserIdentifier;
         if (string.IsNullOrWhiteSpace(userName))
         {
-            // Sem identidade não há como manter a presença nem endereçar mensagens
-            // privadas a essa conexão, em vez de aceitar a conexão "muda" e deixar
-            // ela transmitir como "desconhecido" (invisível na lista online), rejeita
-            // de cara.
-            //
-            // Importante: NÃO chama Context.Abort() aqui. Testamos ao vivo e
-            // Abort() logo depois de um SendAsync pode derrubar a conexão antes
-            // da mensagem realmente sair pela rede (o await do SendAsync só
-            // garante que a mensagem foi entregue pro buffer de saída do
-            // SignalR, não que já foi escrita no socket); o cliente nunca via
-            // o "JoinRejected" e o withAutomaticReconnect() ficava tentando de
-            // novo (e sendo recusado de novo) num loop silencioso. Em vez disso,
-            // só retorna sem entrar em nenhum grupo nem contar presença; é o
-            // PRÓPRIO CLIENTE que fecha a conexão ao processar essa mensagem
-            // (ver ChatService), garantindo que a entrega já aconteceu antes de
-            // qualquer coisa fechar.
+            // Sem identidade não dá pra manter presença nem endereçar mensagem
+            // privada. Note que NÃO chamamos Context.Abort(): abortar logo depois
+            // de um SendAsync pode fechar a conexão antes de a mensagem sair pela
+            // rede, e o cliente nunca recebia a recusa. Quem fecha é o próprio
+            // cliente, ao processar este evento (ver ChatService).
             await Clients.Caller.SendAsync("JoinRejected", "Nome de usuário inválido.");
             return;
         }
 
-        // O nome de usuário funciona como identidade única no sistema inteiro:
-        // é como o SignalR endereça mensagem privada (Clients.User(nome)) e é o
-        // que aparece pra todo mundo saber quem é quem. Duas conexões com o
-        // mesmo nome ficam indistinguíveis (a presença no Redis conta por nome,
-        // não por conexão), então recusa a segunda tentativa de entrar com um
-        // nome já em uso agora, igual todo chat de verdade faz. Existe uma
-        // corrida estreita aqui (duas pessoas entrando com o mesmo nome bem no
-        // mesmo instante podem ambas passar por essa checagem antes de
-        // qualquer uma ser contada); aceitável pro escopo deste projeto.
-        //
-        // A pergunta certa é "esse nome pertence a OUTRO cliente?", e não "esse
-        // nome aparece na presença?".
-        //
-        // Tentamos antes pela presença, e depois só pelas réplicas vivas, e as
-        // duas versões falhavam no mesmo ponto: quando uma réplica morre de
-        // repente, o registro que a pessoa deixou lá continua existindo por
-        // alguns segundos, e a reconexão automática dela (que começa na hora)
-        // batia nesse próprio registro e era recusada com "esse nome já está em
-        // uso". Verificado ao vivo: matando o container com SIGKILL, a pessoa
-        // era expulsa de si mesma.
-        //
-        // O identificador do cliente vem da aba do navegador e sobrevive à
-        // reconexão, então reconectar é sempre permitido, e duas pessoas
-        // diferentes com o mesmo nome continuam sendo barradas.
+        // O nome é a identidade do sistema: é por ele que Clients.User(...)
+        // endereça mensagem privada. A pergunta que importa é "esse nome
+        // pertence a OUTRO cliente?", e não "esse nome existe?": quando uma
+        // réplica morre de repente, o registro que a pessoa deixou sobrevive
+        // alguns segundos, e a reconexão dela batia no próprio registro e era
+        // recusada. Ver INameOwnershipService.
         var clientId = Context.GetHttpContext()?.Request.Query["client"].ToString();
         if (string.IsNullOrWhiteSpace(clientId))
         {
@@ -105,18 +76,14 @@ public class ChatHub : Hub
 
         Context.Items["ClientId"] = clientId;
 
-        // Marca que essa conexão realmente entrou (presença contada, grupos
-        // entrados); OnDisconnectedAsync usa isso pra saber se tem alguma
-        // presença dela pra remover. Sem essa marca, uma conexão recusada que
-        // eventualmente desconecta (o cliente chama stop() sozinho) chamaria
-        // RemoveUserAsync mesmo nunca tendo chamado AddUserAsync, decrementando
-        // por engano a contagem de uma conexão de verdade com o mesmo nome.
+        // Marca que esta conexão de fato entrou. OnDisconnectedAsync consulta
+        // isso pra não descontar presença de uma conexão que foi recusada e
+        // portanto nunca foi contada.
         Context.Items["Joined"] = true;
 
-        // Mandado ANTES de entrar no grupo, pela mesma razao do snapshot do
-        // visualizador mais abaixo: assim nao existe janela em que uma mensagem
-        // ao vivo chegue antes do historico e acabe sobrescrita quando ele
-        // preencher a lista.
+        // Antes de entrar no grupo, pela mesma razão do snapshot mais abaixo:
+        // nenhuma mensagem ao vivo pode chegar antes do histórico e ser
+        // sobrescrita quando ele preencher a lista.
         var history = await _history.GetRecentAsync(GeralRoom);
         await Clients.Caller.SendAsync("RoomHistory", history);
 
@@ -128,11 +95,9 @@ public class ChatHub : Hub
         _logger.LogInformation("[{Replica}] {User} entrou na Sala Geral", _replicaName, userName);
 
         await Clients.Caller.SendAsync("RoomJoined", onlineUsers);
-        // Qual réplica atendeu ESTA conexão. O visualizador já mostra onde todo
-        // mundo caiu, mas quem está usando não tem como saber onde caiu a própria
-        // conexão, que é justamente o que torna o balanceamento perceptível: ao
-        // derrubar uma réplica (docker compose stop backend2), dá pra ver a
-        // reconexão trazer um servidor diferente aqui.
+        // Qual réplica atendeu ESTA conexão: é o que torna o balanceamento
+        // perceptível, porque ao derrubar uma réplica dá pra ver a reconexão
+        // trazer outro servidor aqui.
         await Clients.Caller.SendAsync("ConnectedToReplica", _replicaName);
         await Clients.OthersInGroup(GeralRoom).SendAsync("UserJoined", userName, _replicaName);
 
@@ -162,16 +127,13 @@ public class ChatHub : Hub
             "[{Replica}] mensagem de {User} na Sala Geral: {Message}",
             _replicaName, userName, message);
 
-        // O timestamp é gerado aqui, em UTC, e não já formatado; o navegador de quem
-        // recebe é quem aplica o fuso horário local. O container pode estar rodando em
-        // um fuso diferente do de quem está usando o chat, então formatar no servidor
-        // mostraria a hora errada.
+        // UTC e sem formatar: quem aplica o fuso é o navegador de quem recebe,
+        // já que o container pode estar num fuso diferente.
         var timestamp = DateTimeOffset.UtcNow.ToString("o");
         await Clients.Group(GeralRoom).SendAsync("ReceiveMessage", userName, message, _replicaName, timestamp);
 
-        // Guardado depois da entrega, nao antes: se o Redis engasgar aqui, quem
-        // esta online ja recebeu a mensagem, e o pior caso vira uma falha no
-        // historico e nao uma mensagem que ninguem recebeu.
+        // Depois da entrega, não antes: se o Redis falhar aqui, o pior caso é
+        // perder a mensagem do histórico, não deixar de entregá-la.
         await _history.AddAsync(
             GeralRoom,
             new StoredMessage(userName, message, _replicaName, timestamp));

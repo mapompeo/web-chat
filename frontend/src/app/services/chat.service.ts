@@ -21,13 +21,9 @@ export type ConnectionState = 'conectando' | 'conectado' | 'reconectando' | 'des
 
 @Injectable({ providedIn: 'root' })
 export class ChatService {
-  // Duração de cada "perna" da jornada do pulso no painel do visualizador:
-  // precisa bater com HOP_MS em visualizer-panel.component.ts e com a duração
-  // da animação em @keyframes viz-flow-down/viz-flow-up no styles.scss. Uma
-  // mensagem percorre até 6 pernas (pessoa → nginx → servidor → redis → outro
-  // servidor → nginx → outra pessoa); conectar/desconectar só percorre 2
-  // (pessoa ↔ nginx ↔ servidor, nunca toca o Redis). O pulso só pode sumir da
-  // tela depois que a última perna dele já tiver terminado de animar.
+  // Duração de cada perna da jornada do pulso. Precisa bater com HOP_MS no
+  // visualizer-panel.component.ts e com os @keyframes no styles.scss: o pulso
+  // só some da tela depois que a última perna terminou de animar.
   private static readonly HOP_MS = 500;
 
   private connection?: signalR.HubConnection;
@@ -39,25 +35,19 @@ export class ChatService {
   readonly unreadPrivate = signal<Set<string>>(new Set());
   readonly replicaUsers = signal<Map<string, string[]>>(new Map());
   readonly visualizerPulses = signal<VisualizerPulse[]>([]);
-  // Preenchido quando o servidor recusa a entrada (nome inválido ou já em
-  // uso). Quem consome isso (ChatRoomComponent) precisa reagir de forma
-  // reativa; start() já resolveu com sucesso antes desse evento chegar,
-  // então não dá pra simplesmente capturar isso como um erro do connect().
+  // Recusa de entrada. Não dá pra tratar como erro do connect(): start() já
+  // resolveu com sucesso quando este evento chega.
   readonly joinError = signal<string | null>(null);
 
-  // Qual das réplicas atendeu ESTA conexão, informado pelo servidor em
-  // OnConnectedAsync. Volta pra null enquanto a conexão está caída: nesse
-  // intervalo não há servidor nenhum atendendo, e ao reconectar o load
-  // balancer escolhe de novo, então pode vir outro.
+  // Qual réplica atende esta conexão. Volta a null enquanto a conexão está
+  // caída, porque ao reconectar o load balancer escolhe de novo.
   readonly myReplica = signal<string | null>(null);
   readonly connectionState = signal<ConnectionState>('conectando');
 
-  // Identificador da ABA, não da pessoa. O servidor usa isto pra saber que uma
-  // conexão nova com um nome já ocupado é a mesma aba voltando (reconexão
-  // automática depois de uma réplica cair) e não outra pessoa querendo o mesmo
-  // nome. Fica em sessionStorage de propósito: sobrevive a recarregar a página
-  // e à reconexão, mas cada aba tem o seu, então abrir uma segunda aba com o
-  // mesmo nome continua sendo recusado, como antes.
+  // Identificador da ABA, não da pessoa: é como o servidor distingue "a mesma
+  // aba reconectando" de "outra pessoa querendo o mesmo nome". Em
+  // sessionStorage porque sobrevive ao reload sem ser compartilhado entre
+  // abas, então abrir uma segunda aba com o mesmo nome segue sendo recusado.
   private static clientId(): string {
     const chave = 'chat-client-id';
     let id = sessionStorage.getItem(chave);
@@ -68,14 +58,10 @@ export class ChatService {
     return id;
   }
 
-  // crypto.randomUUID() só existe em "contexto seguro", ou seja, HTTPS ou
-  // localhost. Abrindo o chat pelo IP da máquina na rede local
-  // (http://192.168.x.x), que é justamente como se testa em outro aparelho,
-  // ela vem indefinida: chamar direto derrubava o connect() inteiro com
-  // TypeError, e a tela de entrada mostrava isso como "não foi possível
-  // conectar ao backend", apontando pro lugar errado. crypto.getRandomValues,
-  // por outro lado, existe em qualquer contexto, e o valor só precisa ser
-  // único por aba, não criptograficamente perfeito.
+  // crypto.randomUUID() só existe em contexto seguro (HTTPS ou localhost),
+  // então pelo IP da rede local ele vem indefinido e derrubava o connect()
+  // inteiro. getRandomValues existe em qualquer contexto, e aqui o valor só
+  // precisa ser único por aba.
   private static randomId(): string {
     if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
       return crypto.randomUUID();
@@ -129,11 +115,9 @@ export class ChatService {
       this.myReplica.set(replica);
     });
 
-    // As últimas mensagens da sala, mandadas pelo servidor assim que a conexão
-    // entra. É o que faz recarregar a página (F5) não cair mais numa tela em
-    // branco. Chega ANTES de qualquer "ReceiveMessage" ao vivo, porque o
-    // servidor manda o histórico antes de colocar a conexão no grupo, então
-    // aqui pode substituir a lista sem risco de apagar algo recém-chegado.
+    // Chega antes de qualquer ReceiveMessage ao vivo, porque o servidor manda o
+    // histórico antes de entrar no grupo. Por isso pode substituir a lista sem
+    // risco de apagar mensagem recém-chegada.
     this.connection.on('RoomHistory', (history: ChatMessage[]) => {
       this.geralMessages.set(history ?? []);
     });
@@ -199,19 +183,14 @@ export class ChatService {
 
     this.connection.on('JoinRejected', (reason: string) => {
       this.joinError.set(reason);
-      // Chamar stop() explicitamente (em vez de deixar a conexão cair
-      // "sozinha") é o que impede o withAutomaticReconnect() de tentar de
-      // novo; reconexão automática só dispara quando a conexão cai de
-      // forma inesperada, nunca depois de um stop() intencional. Sem isso,
-      // o cliente ficaria reconectando (e sendo recusado de novo) num loop
-      // silencioso, sem nunca mostrar erro nenhum.
+      // stop() explícito impede o withAutomaticReconnect() de tentar de novo:
+      // reconexão automática só dispara em queda inesperada. Sem isso, o
+      // cliente entraria num laço silencioso de reconectar e ser recusado.
       void this.connection?.stop();
     });
 
-    // A reconexão automática é o que torna a queda de uma réplica indolor: o
-    // cliente refaz a conexão sozinho e o Nginx a entrega pra outro servidor.
-    // Enquanto isso não termina, quem está usando merece ver o que está
-    // acontecendo em vez de uma tela que simplesmente parou de responder.
+    // Enquanto a reconexão acontece, quem está usando precisa ver o que está
+    // havendo, em vez de uma tela que simplesmente parou de responder.
     this.connection.onreconnecting(() => {
       this.connectionState.set('reconectando');
       this.myReplica.set(null);

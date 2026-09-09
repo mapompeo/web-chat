@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { execFileSync } from 'node:child_process';
-import { entrar, enviar, nomeUnico, balaoComTexto, replicaAtual, seloDoServidor } from './helpers';
+import { signIn, sendMessage, uniqueName, bubbleWithText, currentReplica, serverBadge } from './helpers';
 
 /**
  * Este arquivo é o único que mexe na infraestrutura durante o teste, e por isso
@@ -12,7 +12,7 @@ import { entrar, enviar, nomeUnico, balaoComTexto, replicaAtual, seloDoServidor 
  * cabeçalho do Dockerfile.render), então derrubar uma derruba tudo.
  */
 
-const NOMES_DOS_CONTAINERS: Record<string, string> = {
+const CONTAINER_BY_REPLICA: Record<string, string> = {
   'Servidor A': 'backend1',
   'Servidor B': 'backend2',
   'Servidor C': 'backend3'
@@ -22,23 +22,23 @@ function docker(...args: string[]): void {
   execFileSync('docker', args, { cwd: '..', stdio: 'pipe' });
 }
 
-const rodandoNoStackLocal = (process.env.E2E_BASE_URL ?? 'http://localhost').includes('localhost');
+const runningAgainstLocalStack = (process.env.E2E_BASE_URL ?? 'http://localhost').includes('localhost');
 
 test.describe('tolerância a falha', () => {
-  test.skip(!rodandoNoStackLocal, 'derruba container, só faz sentido no docker compose local');
+  test.skip(!runningAgainstLocalStack, 'derruba container, só faz sentido no docker compose local');
   // Precisa de tempo pra reconexão automática e pra varredura de presença órfã.
   test.setTimeout(120_000);
 
   test('derrubar a réplica migra a pessoa para outra, sem perder a conversa', async ({ page }) => {
-    await entrar(page, nomeUnico('Karina'));
+    await signIn(page, uniqueName('Karina'));
 
-    const replicaAntes = await replicaAtual(page);
-    const container = NOMES_DOS_CONTAINERS[replicaAntes];
-    expect(container, `réplica inesperada: ${replicaAntes}`).toBeTruthy();
+    const replicaBefore = await currentReplica(page);
+    const container = CONTAINER_BY_REPLICA[replicaBefore];
+    expect(container, `réplica inesperada: ${replicaBefore}`).toBeTruthy();
 
-    const texto = `antes da queda ${Date.now()}`;
-    await enviar(page, texto);
-    await expect(balaoComTexto(page, texto)).toBeVisible();
+    const text = `antes da queda ${Date.now()}`;
+    await sendMessage(page, text);
+    await expect(bubbleWithText(page, text)).toBeVisible();
 
     // kill e não stop: stop manda SIGTERM e dá ao processo a chance de encerrar
     // direito, o que esconde justamente o caso difícil. kill é morte súbita,
@@ -47,19 +47,19 @@ test.describe('tolerância a falha', () => {
 
     try {
       // O selo tem que acabar mostrando OUTRA réplica, sem erro nenhum na tela.
-      await expect(seloDoServidor(page)).toContainText(/Servidor [ABC]/, { timeout: 90_000 });
+      await expect(serverBadge(page)).toContainText(/Servidor [ABC]/, { timeout: 90_000 });
       await expect
-        .poll(async () => await replicaAtual(page), { timeout: 90_000 })
-        .not.toBe(replicaAntes);
+        .poll(async () => await currentReplica(page), { timeout: 90_000 })
+        .not.toBe(replicaBefore);
 
       await expect(page.locator('.error-text')).toHaveCount(0);
       // O histórico vem do Redis na reconexão, então a conversa continua ali.
-      await expect(balaoComTexto(page, texto)).toBeVisible();
+      await expect(bubbleWithText(page, text)).toBeVisible();
 
       // E a conversa segue funcionando na réplica nova.
-      const depois = `depois da queda ${Date.now()}`;
-      await enviar(page, depois);
-      await expect(balaoComTexto(page, depois)).toBeVisible();
+      const after = `depois da queda ${Date.now()}`;
+      await sendMessage(page, after);
+      await expect(bubbleWithText(page, after)).toBeVisible();
     } finally {
       docker('compose', 'start', container);
     }

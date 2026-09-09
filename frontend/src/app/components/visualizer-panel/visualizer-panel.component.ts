@@ -131,26 +131,19 @@ export class VisualizerPanelComponent {
     return this.chatService.replicaUsers().get(replica) ?? [];
   }
 
-  // Retorna, pra um pulso e uma réplica específicos, cada "perna" da jornada
-  // que esse pulso atravessa NESSA réplica: em qual faixa de conectores ela
-  // aparece (1 = Redis↔Servidor, 2 = Servidor↔Nginx, 3 = Nginx↔Pessoas), pra
-  // que lado ela anda, e em que posição da sequência total ela entra (usado
-  // pra calcular o atraso da animação, uma perna de cada vez).
+  // Cada perna da jornada de um pulso nesta réplica: em qual faixa aparece
+  // (1 = Redis/Servidor, 2 = Servidor/Nginx, 3 = Nginx/Pessoas), pra que lado
+  // anda e em que posição da sequência entra, o que define o atraso da animação.
   //
-  // Conectar/desconectar só atravessa as faixas 2 e 3 (nunca toca o Redis,
-  // já que presença não passa pelo backplane de mensagens). Mensagem geral ou
-  // privada atravessa as 3: sobe da réplica de origem até o Redis (pernas 0-2)
-  // e desce do Redis até cada réplica ativa (pernas 3-5).
+  // Conectar e desconectar só usam as faixas 2 e 3, porque presença não passa
+  // pelo backplane. Mensagem usa as três: sobe da origem até o Redis (0-2) e
+  // desce dele até cada réplica ativa (3-5).
   //
-  // IMPORTANTE: a própria réplica de quem mandou também recebe a entrega
-  // pelas pernas 3-5, igual qualquer outra réplica ativa; não existe atalho
-  // "entrega local direto, sem Redis". Conferimos isso no código-fonte real
-  // do RedisHubLifetimeManager (decompilado do pacote instalado): SendGroupAsync
-  // só publica no Redis; cada servidor, INCLUSIVE o que mandou, só entrega pros
-  // próprios clientes locais quando recebe a publicação de volta via sua
-  // própria assinatura (SubscribeToGroupAsync). Ou seja, mesmo quem manda
-  // recebe a própria mensagem através de uma ida e volta pelo Redis, igual
-  // todo mundo mais. Por isso a réplica de origem não é excluída da entrega.
+  // A réplica de origem NÃO é excluída da entrega, e isso é intencional: não
+  // existe atalho de entrega local. Conferido no código-fonte do
+  // RedisHubLifetimeManager, onde SendGroupAsync apenas publica, e todo
+  // servidor, inclusive o que enviou, só entrega aos próprios clientes ao
+  // receber a publicação de volta.
   private legsFor(pulse: VisualizerPulse, replica: string): PulseLeg[] {
     if (pulse.kind === 'connect' || pulse.kind === 'disconnect') {
       if (pulse.replica !== replica) return [];
@@ -179,12 +172,9 @@ export class VisualizerPanelComponent {
     return legs;
   }
 
-  // Só se aplica a mensagem geral; mensagem privada é anônima de propósito
-  // (não carrega nome de ninguém), então não tem como saber quem destacar ali.
-  // Quem mandou nunca esmaece; todo mundo mais, em qualquer réplica envolvida
-  // na jornada (origem ou destino), fica esmaecido enquanto a mensagem ainda
-  // está "no ar"; assim que o pulso termina e some da tela, todo mundo volta
-  // ao normal.
+  // Só vale pra mensagem geral: a privada é anônima de propósito, então não há
+  // quem destacar. Quem enviou nunca esmaece; os demais voltam ao normal assim
+  // que o pulso termina.
   isDimmed(person: string, replica: string): boolean {
     for (const pulse of this.chatService.visualizerPulses()) {
       if (pulse.kind !== 'geral') continue;
