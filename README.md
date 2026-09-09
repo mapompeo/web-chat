@@ -83,6 +83,34 @@ A conexão cai, o selo pisca em âmbar, e em seguida você reaparece em outro se
 mensagens preservadas. Em cerca de quinze segundos, a presença que ficou órfã na réplica morta
 some do visualizador sozinha.
 
+## Testes
+
+O backend tem testes de unidade em xUnit, cobrindo o comportamento do hub:
+
+```bash
+cd backend && dotnet test
+```
+
+Os testes de ponta a ponta rodam com Playwright, contra o stack de verdade
+subido pelo `docker compose`, e não contra um servidor de desenvolvimento. É de
+propósito: o que vale verificar aqui não é se um componente renderiza, e sim se
+duas pessoas em réplicas diferentes se enxergam, se o nome duplicado é recusado
+e se a conversa sobrevive a recarregar a página. Nada disso existe sem a
+infraestrutura em volta.
+
+```bash
+docker compose up -d
+cd frontend && npm run e2e
+```
+
+Um deles derruba uma réplica com `docker compose kill` no meio da execução e
+verifica que a pessoa migra para outra sem perder a conversa. Ele mata o
+processo em vez de encerrá-lo com educação, porque encerrar direito esconde
+justamente o caso difícil: sem `OnDisconnectedAsync`, fica presença órfã para
+trás. Esse teste só roda contra o stack local, e se anula sozinho quando a
+suíte aponta para a aplicação publicada, onde as três réplicas vivem no mesmo
+container.
+
 ## Decisões técnicas
 
 **`least_conn` em vez de round-robin.** Round-robin distribui bem requisições curtas, mas
@@ -130,7 +158,7 @@ mesmo rosto.
 | Frontend | Angular com Signals, sem biblioteca de componentes |
 | Load balancer | Nginx com `least_conn` |
 | Orquestração | Docker Compose, três réplicas nomeadas |
-| Testes | xUnit e Moq no backend |
+| Testes | xUnit e Moq no backend, Playwright de ponta a ponta |
 
 ## Limitações conhecidas
 

@@ -1,0 +1,6 @@
+
+
+# Artefatos das execucoes de teste de ponta a ponta
+/frontend/test-results/
+/frontend/playwright-report/
+/frontend/blob-report/
